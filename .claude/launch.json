@@ -5,6 +5,8 @@
       "name": "dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
+        "--prefix",
+        "ownus",
         "run",
         "dev"
       ],

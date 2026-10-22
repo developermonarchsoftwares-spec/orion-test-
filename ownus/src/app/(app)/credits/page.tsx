@@ -22,22 +22,26 @@ export default function CreditsPage() {
   });
   const [transactions, setTransactions] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [purchasingPkgId, setPurchasingPkgId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadCreditData() {
       try {
-        const [pkgs, config, txData, payData] = await Promise.all([
+        const [pkgs, config, txData, payData, invData] = await Promise.all([
           apiClient.credit.getPackages(),
           apiClient.credit.getConfig(),
           apiClient.credit.getTransactions(1, 25),
           apiClient.payments.getHistory(),
+          // a failed invoice list must not take the rest of the page down with it
+          apiClient.payments.listInvoices().catch(() => []),
         ]);
         if (pkgs && pkgs.length > 0) setPackages(pkgs);
         if (config) setPricingConfig(config);
         if (txData?.items) setTransactions(txData.items);
         if (payData) setPayments(payData);
+        if (Array.isArray(invData)) setInvoices(invData);
       } catch (err) {
         console.warn("Credit API fallback active:", err);
       } finally {
@@ -85,9 +89,10 @@ export default function CreditsPage() {
         }),
       refresh: async () => {
         await refreshProfile();
-        const [txData, payData] = await Promise.all([apiClient.credit.getTransactions(1, 25), apiClient.payments.getHistory()]);
+        const [txData, payData, invData] = await Promise.all([apiClient.credit.getTransactions(1, 25), apiClient.payments.getHistory(), apiClient.payments.listInvoices().catch(() => [])]);
         if (txData?.items) setTransactions(txData.items);
         if (payData) setPayments(payData);
+        if (Array.isArray(invData)) setInvoices(invData);
       },
     });
     setPurchasingPkgId(null);
@@ -129,8 +134,8 @@ export default function CreditsPage() {
       slug: "starter",
       name: "Starter Pack",
       description: "For individual founders and sales reps building targeted lead lists.",
-      priceInr: 99,
-      priceAnnualInr: 79,
+      priceInr: 299,
+      priceAnnualInr: 239,
       periodText: "/pack",
       credits: 100,
       billingType: "ONE_TIME",
@@ -150,8 +155,8 @@ export default function CreditsPage() {
       slug: "growth",
       name: "Growth Pack",
       description: "Ideal for growing sales teams scaling outbound client acquisition.",
-      priceInr: 299,
-      priceAnnualInr: 239,
+      priceInr: 499,
+      priceAnnualInr: 399,
       periodText: "/pack",
       credits: 350,
       billingType: "ONE_TIME",
@@ -651,38 +656,28 @@ export default function CreditsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                      {payments.length > 0 ? (
-                        payments.map((inv: any, i: number) => (
+                      {invoices.length > 0 ? (
+                        invoices.map((inv: any) => (
                           <tr key={inv.id}>
                             <td className="px-6 py-3.5 font-mono font-medium text-zinc-900 dark:text-zinc-100">
-                              INV-2026-{String(i + 1).padStart(3, "0")}
+                              {inv.invoiceNumber}
                             </td>
                             <td className="px-6 py-3.5 text-zinc-500 font-mono">
-                              {inv.date ? formatRelativeDate(inv.date) : "Recent"}
+                              {inv.issuedAt ? formatRelativeDate(inv.issuedAt) : "Recent"}
                             </td>
                             <td className="px-6 py-3.5 font-medium">{inv.description}</td>
                             <td className="px-6 py-3.5">
                               <span className="px-2 py-0.5 rounded-md text-[11px] font-medium border bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700">
-                                Paid
+                                {inv.status === "REFUNDED" ? "Refunded" : "Paid"}
                               </span>
                             </td>
                             <td className="px-6 py-3.5 text-right">
                               <button
                                 onClick={async () => {
                                   try {
-                                    await apiClient.payments.downloadInvoice({
-                                      id: inv.id || `inv_${i + 1}`,
-                                      receiptNumber: `INV-2026-${String(i + 1).padStart(3, "0")}`,
-                                      customerName: "Valued Customer",
-                                      customerEmail: "user@example.com",
-                                      company: "Orion Customer",
-                                      plan: inv.description?.includes("Growth") ? "Growth" : inv.description?.includes("Agency") ? "Agency" : "Starter",
-                                      amount: inv.amount || 99,
-                                      creditsPurchased: inv.credits || 100,
-                                      paymentMethod: "Razorpay UPI",
-                                      date: inv.date || new Date().toISOString().split("T")[0],
-                                    });
-                                    toast.success(`Downloaded invoice INV-2026-${String(i + 1).padStart(3, "0")}`);
+                                    // the real invoice, built by the server from the recorded payment
+                                    await apiClient.payments.downloadInvoicePdf(inv.id, inv.invoiceNumber);
+                                    toast.success(`Downloaded invoice ${inv.invoiceNumber} (PDF)`);
                                   } catch (err: any) {
                                     toast.error(err?.message || "Failed to download invoice");
                                   }
@@ -690,7 +685,7 @@ export default function CreditsPage() {
                                 className="text-zinc-900 dark:text-zinc-100 hover:underline inline-flex items-center gap-1 text-xs font-semibold cursor-pointer"
                               >
                                 <Download className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">Download</span>
+                                <span className="hidden sm:inline">Download PDF</span>
                               </button>
                             </td>
                           </tr>

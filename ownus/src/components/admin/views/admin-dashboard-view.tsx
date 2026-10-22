@@ -62,7 +62,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white/95 dark:bg-zinc-900/95 border border-zinc-200 dark:border-zinc-700/80 rounded-xl p-3 shadow-xl backdrop-blur-md text-xs space-y-1.5 min-w-[140px]">
-        <div className="font-semibold text-zinc-800 dark:text-zinc-300 pb-1 border-b border-zinc-200 dark:border-zinc-800">{label}</div>
+        {label ? (
+          <div className="font-semibold text-zinc-800 dark:text-zinc-300 pb-1 border-b border-zinc-200 dark:border-zinc-800">{label}</div>
+        ) : null}
         {payload.map((entry: any, index: number) => (
           <div key={`item-${index}`} className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
@@ -180,19 +182,31 @@ export function AdminDashboardView({
   ];
 
   // Real Industry Distribution calculation
-  const industryData = useMemo(() => {
+  const { industryData, totalSectorsCount } = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const b of businesses) {
       const ind = b.industry?.trim() || 'General Enterprise';
       counts[ind] = (counts[ind] || 0) + 1;
     }
+    const totalSectors = Object.keys(counts).length;
     const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#06B6D4', '#EC4899', '#64748B'];
-    return Object.entries(counts).map(([name, value], i) => ({
+    const MAX_SLICES = colors.length - 1;
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const top = sorted.slice(0, MAX_SLICES);
+    const restCount = sorted.slice(MAX_SLICES).reduce((acc, [, c]) => acc + c, 0);
+    const rows = restCount > 0 ? [...top, ['Other', restCount] as [string, number]] : top;
+
+    const data = rows.map(([name, value], i) => ({
       name,
       value,
-      color: colors[i % colors.length]
+      share: totalBusinesses > 0 ? Math.round((value / totalBusinesses) * 100) : 0,
+      color: name === 'Other' && restCount > 0 && i === rows.length - 1
+        ? colors[colors.length - 1]
+        : colors[i % (colors.length - 1)]
     }));
-  }, [businesses]);
+
+    return { industryData: data, totalSectorsCount: totalSectors };
+  }, [businesses, totalBusinesses]);
 
   // Real State Distribution calculation
   const stateDistributionData = useMemo(() => {
@@ -530,7 +544,7 @@ export function AdminDashboardView({
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Verified entities across priority sectors</p>
             </div>
             <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 px-2 py-0.5 rounded-md">
-              {industryData.length} Sectors
+              {totalSectorsCount} Sectors
             </span>
           </div>
 
@@ -541,37 +555,46 @@ export function AdminDashboardView({
               <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Industry distribution will appear as businesses are imported.</p>
             </div>
           ) : (
-            <div className="h-60 w-full min-w-0 relative flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={industryData}
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={55}
-                    outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {industryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} stroke="currentColor" className="text-white dark:text-zinc-900" strokeWidth={2} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend 
-                    layout="horizontal" 
-                    verticalAlign="bottom" 
-                    align="center" 
-                    iconType="circle" 
-                    wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }}
-                    formatter={(value) => <span className="text-zinc-600 dark:text-zinc-400">{value}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="h-60 w-full min-w-0 flex flex-col justify-between">
+              <div className="h-36 w-full min-w-0 relative flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={industryData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={46}
+                      outerRadius={64}
+                      paddingAngle={industryData.length > 1 ? 2 : 0}
+                      dataKey="value"
+                    >
+                      {industryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="currentColor" className="text-white dark:text-zinc-900" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
 
-              <div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-                <span className="text-[10px] uppercase font-bold text-zinc-400 dark:text-zinc-500 block">Total</span>
-                <span className="text-base font-bold font-mono text-zinc-900 dark:text-white">{totalBusinesses}</span>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                  <span className="text-[9px] uppercase font-bold text-zinc-400 dark:text-zinc-500 block leading-none">Total</span>
+                  <span className="text-base font-bold font-mono text-zinc-900 dark:text-white leading-tight">{totalBusinesses}</span>
+                </div>
+              </div>
+
+              {/* Legend grid outside SVG */}
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 max-h-20 overflow-y-auto pt-2 border-t border-zinc-100 dark:border-zinc-800/60 pr-1">
+                {industryData.map((entry) => (
+                  <div key={entry.name} className="flex items-center gap-1.5 text-[11px] min-w-0">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                    <span className="truncate text-zinc-700 dark:text-zinc-300 font-medium" title={entry.name}>
+                      {entry.name}
+                    </span>
+                    <span className="ml-auto font-mono text-[10px] text-zinc-400 dark:text-zinc-500 shrink-0 tabular-nums">
+                      {entry.value}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

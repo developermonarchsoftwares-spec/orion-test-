@@ -27,8 +27,7 @@ import {
   CartesianGrid, 
   PieChart, 
   Pie, 
-  Cell, 
-  Legend 
+  Cell
 } from 'recharts';
 import { AdminBusinessRecord, TransactionRecord, CustomerUser } from '@/types/admin';
 
@@ -66,11 +65,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       counts[ind] = (counts[ind] || 0) + 1;
     }
     const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899', '#71717a'];
-    return Object.entries(counts).map(([name, count], i) => ({
+    // A pie with dozens of slices is unreadable (and a long legend squeezes it to a sliver): show the largest industries and fold the
+    // rest into one "Other" slice, so there is exactly one color per slice.
+    const MAX_SLICES = colors.length - 1;
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const top = sorted.slice(0, MAX_SLICES);
+    const restCount = sorted.slice(MAX_SLICES).reduce((n, [, c]) => n + c, 0);
+    const rows = restCount > 0 ? [...top, ['Other', restCount] as [string, number]] : top;
+    return rows.map(([name, count], i) => ({
       name,
       count,
       share: totalBusinesses > 0 ? Math.round((count / totalBusinesses) * 100) : 0,
-      fill: colors[i % colors.length]
+      fill: name === 'Other' && restCount > 0 && i === rows.length - 1 ? colors[colors.length - 1] : colors[i % (colors.length - 1)],
     }));
   }, [records, totalBusinesses]);
 
@@ -373,26 +379,37 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <p className="text-[11px] text-zinc-500 mt-0.5">No industry records available yet.</p>
               </div>
             ) : (
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={industryDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={75}
-                      paddingAngle={3}
-                      dataKey="count"
-                    >
-                      {industryDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} stroke="#18181b" strokeWidth={2} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px', color: '#f4f4f5' }} />
-                    <Legend wrapperStyle={{ fontSize: '11px' }} />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div className="w-full">
+                <div className="h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={industryDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={75}
+                        paddingAngle={industryDistribution.length > 1 ? 2 : 0}
+                        dataKey="count"
+                      >
+                        {industryDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} stroke="#18181b" strokeWidth={2} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px', color: '#f4f4f5' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                {/* legend outside the chart: it can never shrink the pie, and long industry names wrap instead of overflowing */}
+                <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 max-h-32 overflow-y-auto pr-1">
+                  {industryDistribution.map((entry) => (
+                    <li key={entry.name} className="flex items-center gap-2 text-[11px] text-zinc-300 min-w-0">
+                      <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: entry.fill }} />
+                      <span className="truncate" title={entry.name}>{entry.name}</span>
+                      <span className="ml-auto text-zinc-500 tabular-nums shrink-0">{entry.count} · {entry.share}%</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

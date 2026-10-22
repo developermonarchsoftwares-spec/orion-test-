@@ -26,7 +26,10 @@ describe('Privileged operations and the privileged surface (Phase 25)', () => {
   const emails: string[] = [];
   const adminEmail = `qa.p25ops.${Date.now()}@monarchsoftwares.com`;
   let admin: { Authorization: string };
+  let superAdmin: { Authorization: string };
+  const superEmail = `qa.p25super.${Date.now()}@monarchsoftwares.com`;
   let adminId = '';
+  let superId = '';
   let customer: { id: string; auth: { Authorization: string }; email: string };
   let routes: Array<{ method: string; path: string; roles: string[]; isPublic: boolean }> = [];
 
@@ -61,18 +64,20 @@ describe('Privileged operations and the privileged surface (Phase 25)', () => {
   beforeAll(async () => {
     testApp = new TestAppHelper();
     app = await testApp.init();
-    await testApp.cleanupUsers([adminEmail]);
+    await testApp.cleanupUsers([adminEmail, superEmail]);
     adminId = await testApp.provisionAdmin(adminEmail, 'ADMIN');
     admin = { Authorization: `Bearer ${jwt.sign({ sub: adminId, email: adminEmail, role: 'ADMIN', status: 'ACTIVE' }, TEST_SECRETS.jwtAccess, { expiresIn: '1h', issuer: 'orion-api', audience: 'orion-client' })}` };
     const email = `p25.ops.cust.${Date.now()}@orion-test.io`;
     emails.push(email);
     const reg = unwrap(await api().post('/api/v1/auth/register').send({ email, password: 'Phase25Pass123!', firstName: 'Op', lastName: 'Cu' }));
+    superId = await testApp.provisionAdmin(superEmail, 'SUPER_ADMIN');
+    superAdmin = { Authorization: `Bearer ${jwt.sign({ sub: superId, email: superEmail, role: 'SUPER_ADMIN', status: 'ACTIVE' }, TEST_SECRETS.jwtAccess, { expiresIn: '1h', issuer: 'orion-api', audience: 'orion-client' })}` };
     customer = { id: reg.user.id, email, auth: { Authorization: `Bearer ${reg.tokens.accessToken}` } };
     routes = discover();
   });
   beforeEach(clear);
   afterAll(async () => {
-    await testApp.cleanupUsers([...emails, adminEmail]);
+    await testApp.cleanupUsers([...emails, adminEmail, superEmail]);
     await testApp.close();
   });
 
@@ -169,6 +174,53 @@ describe('Privileged operations and the privileged surface (Phase 25)', () => {
     });
   });
 
+  describe('role separation: moving money is for a SUPER_ADMIN, ordinary administrators keep read access', () => {
+    let roleTestUserId = '';
+    beforeAll(async () => {
+      const e = `p25.role.cust.${Date.now()}@orion-test.io`;
+      emails.push(e);
+      const r = unwrap(await api().post('/api/v1/auth/register').send({ email: e, password: 'Phase25Pass123!', firstName: 'Role', lastName: 'Cu' }));
+      roleTestUserId = r.user.id;
+    });
+    const MONEY_WRITES: Array<[string, string, () => object]> = [
+      ['post', '/api/v1/credit/admin/adjust', () => ({ userId: roleTestUserId, purchasedDelta: 5, reason: 'role separation test' })],
+      ['post', '/api/v1/credit/admin/packages', () => ({ name: 'Role test', slug: `role-test-${Date.now()}`, credits: 10, priceInr: 99 })],
+      ['put', `/api/v1/credit/admin/packages/${ZERO}`, () => ({ name: 'Role test rename' })],
+      ['delete', `/api/v1/credit/admin/packages/${ZERO}`, () => ({})],
+      ['put', '/api/v1/credit/admin/config', () => ({ key: 'dailyFreeCredits', value: '5' })],
+      ['post', '/api/v1/billing/admin/refunds', () => ({ paymentOrderId: ZERO, reason: 'role separation test' })],
+    ];
+
+    it('an ADMIN is refused (403) on every credit, pricing and refund write, and nothing changes', async () => {
+      const walletBefore = (await testApp.db.select().from(schema.userWallets).where(eq(schema.userWallets.userId, customer.id))) as any[];
+      for (const [method, url, body] of MONEY_WRITES) {
+        const res = await (api() as any)[method](url).set(admin).send(body());
+        expect([method, url, res.status]).toEqual([method, url, 403]);
+      }
+      const walletAfter = (await testApp.db.select().from(schema.userWallets).where(eq(schema.userWallets.userId, customer.id))) as any[];
+      expect(walletAfter.map((w) => w.balance)).toEqual(walletBefore.map((w) => w.balance));
+    });
+
+    it('a SUPER_ADMIN is not refused by the role check on the same writes (a wallet adjustment succeeds)', async () => {
+      for (const [method, url, body] of MONEY_WRITES) {
+        const res = await (api() as any)[method](url).set(superAdmin).send(body());
+        expect([method, url, res.status === 403]).toEqual([method, url, false]);
+      }
+    });
+
+    it('an ADMIN keeps read access to packages and refunds', async () => {
+      expect((await api().get('/api/v1/credit/admin/packages').set(admin)).status).toBe(200);
+      expect((await api().get('/api/v1/billing/admin/refunds').set(admin)).status).toBe(200);
+    });
+
+    it('the role rule is declared in the code: exactly these six writes are SUPER_ADMIN-only among the credit and billing admin routes', () => {
+      const superOnly = routes.filter((r) => r.roles.length === 1 && r.roles[0] === 'SUPER_ADMIN' && /\/(credit|billing)\/admin\//.test(r.path)).map((r) => `${r.method.toUpperCase()} ${r.path.replace('/api/v1', '')}`).sort();
+      expect(superOnly).toEqual(
+        ['DELETE /credit/admin/packages/:id', 'POST /billing/admin/refunds', 'POST /credit/admin/adjust', 'POST /credit/admin/packages', 'PUT /credit/admin/config', 'PUT /credit/admin/packages/:id'].sort(),
+      );
+    });
+  });
+
   describe('credit adjustments: authorised, validated, atomic and audited', () => {
     it('a rejected request changes nothing and writes no adjustment audit entry', async () => {
       const before = await auditCount('CREDIT_ADJUSTMENT');
@@ -179,7 +231,7 @@ describe('Privileged operations and the privileged surface (Phase 25)', () => {
         { purchasedDelta: 5 },
         { userId: customer.id, purchasedDelta: '5; DROP TABLE users' },
       ]) {
-        expect((await api().post('/api/v1/credit/admin/adjust').set(admin).send(body)).status).toBe(400);
+        expect((await api().post('/api/v1/credit/admin/adjust').set(superAdmin).send(body)).status).toBe(400);
       }
       expect((await wallet(customer.id))?.purchasedCredits ?? 0).toBe(0);
       expect(await auditCount('CREDIT_ADJUSTMENT')).toBe(before);
@@ -187,7 +239,7 @@ describe('Privileged operations and the privileged surface (Phase 25)', () => {
 
     it('an adjustment of an unknown or erased account is refused cleanly (404): no wallet is created for it and no half-written ledger row remains', async () => {
       const unknown = '11111111-2222-4333-8444-555555555555';
-      const res = await api().post('/api/v1/credit/admin/adjust').set(admin).send({ userId: unknown, purchasedDelta: 5, reason: 'unknown account' });
+      const res = await api().post('/api/v1/credit/admin/adjust').set(superAdmin).send({ userId: unknown, purchasedDelta: 5, reason: 'unknown account' });
       expect(res.status).toBe(404);
       expect(await wallet(unknown)).toBeUndefined();
       const tx = (await testApp.db.select().from(schema.creditTransactions).where(eq(schema.creditTransactions.userId, unknown))) as any[];
@@ -196,19 +248,19 @@ describe('Privileged operations and the privileged surface (Phase 25)', () => {
 
     it('a valid adjustment is applied once, with a ledger row, a balance that adds up, and an audit entry naming the administrator and not the reason text verbatim secrets', async () => {
       const w0 = await wallet(customer.id);
-      const res = await api().post('/api/v1/credit/admin/adjust').set(admin).send({ userId: customer.id, purchasedDelta: 7, reason: 'goodwill for ticket 123' });
+      const res = await api().post('/api/v1/credit/admin/adjust').set(superAdmin).send({ userId: customer.id, purchasedDelta: 7, reason: 'goodwill for ticket 123' });
       expect(res.status).toBe(201);
       const w1 = await wallet(customer.id);
       expect(w1.purchasedCredits).toBe((w0?.purchasedCredits ?? 0) + 7);
       expect(w1.balance).toBe(w1.dailyCredits + w1.purchasedCredits);
-      const audits = ((await testApp.db.select().from(schema.auditLogs).where(eq(schema.auditLogs.action, 'CREDIT_ADJUSTMENT'))) as any[]).filter((r) => r.userId === adminId);
+      const audits = ((await testApp.db.select().from(schema.auditLogs).where(eq(schema.auditLogs.action, 'CREDIT_ADJUSTMENT'))) as any[]).filter((r) => r.userId === superId);
       expect(audits.length).toBeGreaterThanOrEqual(1);
       expect(JSON.stringify(audits)).not.toContain(TEST_SECRETS.jwtAccess);
     });
 
     it('a customer cannot adjust their own or anyone else\'s credits', async () => {
       const before = (await wallet(customer.id))?.purchasedCredits ?? 0;
-      for (const target of [customer.id, adminId]) {
+      for (const target of [customer.id, superId]) {
         expect((await api().post('/api/v1/credit/admin/adjust').set(customer.auth).send({ userId: target, purchasedDelta: 100 })).status).toBe(403);
       }
       expect((await wallet(customer.id))?.purchasedCredits ?? 0).toBe(before);
@@ -228,40 +280,40 @@ describe('Privileged operations and the privileged surface (Phase 25)', () => {
     });
 
     it('creating a package is audited with the administrator as the actor', async () => {
-      const res = await api().post('/api/v1/credit/admin/packages').set(admin).send({ slug, name: 'P25 test pack', credits: 100, priceInr: 499 });
+      const res = await api().post('/api/v1/credit/admin/packages').set(superAdmin).send({ slug, name: 'P25 test pack', credits: 100, priceInr: 499 });
       expect(res.status).toBe(201);
       packageId = unwrap(res).id;
       const rows = await pkgAudits('CREDIT_PACKAGE_CREATED');
       expect(rows).toHaveLength(1);
-      expect(rows[0].userId).toBe(adminId);
+      expect(rows[0].userId).toBe(superId);
       expect(JSON.stringify(rows[0].newValues)).toContain('499');
     });
 
     it('changing a price is audited with the old and the new value', async () => {
-      const res = await api().put(`/api/v1/credit/admin/packages/${packageId}`).set(admin).send({ priceInr: 1 });
+      const res = await api().put(`/api/v1/credit/admin/packages/${packageId}`).set(superAdmin).send({ priceInr: 1 });
       expect(res.status).toBe(200);
       const rows = await pkgAudits('CREDIT_PACKAGE_UPDATED');
       expect(rows).toHaveLength(1);
-      expect(rows[0].userId).toBe(adminId);
+      expect(rows[0].userId).toBe(superId);
       expect(JSON.stringify(rows[0].oldValues)).toContain('499');
       expect(JSON.stringify(rows[0].newValues)).toContain('"priceInr":1');
     });
 
     it('an unknown or malformed package id is a clean 404 / 400 and writes no audit entry', async () => {
       const before = (await testApp.db.select().from(schema.auditLogs)).length;
-      expect((await api().put(`/api/v1/credit/admin/packages/${ZERO}`).set(admin).send({ priceInr: 5 })).status).toBe(404);
-      expect((await api().put('/api/v1/credit/admin/packages/not-a-uuid').set(admin).send({ priceInr: 5 })).status).toBe(400);
-      expect((await api().delete(`/api/v1/credit/admin/packages/${ZERO}`).set(admin)).status).toBe(404);
-      expect((await api().delete('/api/v1/credit/admin/packages/not-a-uuid').set(admin)).status).toBe(400);
+      expect((await api().put(`/api/v1/credit/admin/packages/${ZERO}`).set(superAdmin).send({ priceInr: 5 })).status).toBe(404);
+      expect((await api().put('/api/v1/credit/admin/packages/not-a-uuid').set(superAdmin).send({ priceInr: 5 })).status).toBe(400);
+      expect((await api().delete(`/api/v1/credit/admin/packages/${ZERO}`).set(superAdmin)).status).toBe(404);
+      expect((await api().delete('/api/v1/credit/admin/packages/not-a-uuid').set(superAdmin)).status).toBe(400);
       expect((await testApp.db.select().from(schema.auditLogs)).length).toBe(before);
     });
 
     it('deleting a package is audited, and the audit entry survives it', async () => {
-      const res = await api().delete(`/api/v1/credit/admin/packages/${packageId}`).set(admin);
+      const res = await api().delete(`/api/v1/credit/admin/packages/${packageId}`).set(superAdmin);
       expect(res.status).toBe(200);
       const rows = await pkgAudits('CREDIT_PACKAGE_DELETED');
       expect(rows).toHaveLength(1);
-      expect(rows[0].userId).toBe(adminId);
+      expect(rows[0].userId).toBe(superId);
     });
   });
 
@@ -269,7 +321,7 @@ describe('Privileged operations and the privileged surface (Phase 25)', () => {
     it('a refund request by a customer is refused; one for an unknown payment by an administrator changes nothing', async () => {
       expect((await api().post('/api/v1/billing/admin/refunds').set(customer.auth).send({ paymentOrderId: ZERO, reason: 'x' })).status).toBe(403);
       const refunds = (await testApp.db.select().from(schema.refunds)) as any[];
-      const res = await api().post('/api/v1/billing/admin/refunds').set(admin).send({ paymentOrderId: ZERO, reason: 'unknown payment' });
+      const res = await api().post('/api/v1/billing/admin/refunds').set(superAdmin).send({ paymentOrderId: ZERO, reason: 'unknown payment' });
       expect(res.status).toBeGreaterThanOrEqual(400);
       expect(res.status).toBeLessThan(500);
       expect(((await testApp.db.select().from(schema.refunds)) as any[]).length).toBe(refunds.length);

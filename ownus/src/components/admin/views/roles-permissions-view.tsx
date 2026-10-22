@@ -140,8 +140,12 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
             Roles & Granular Permissions Matrix
           </h1>
           <p className="text-sm text-zinc-400 mt-1">
-            Enforce least-privilege security access across 12 Orion core modules for Super Admins, Data Managers, Reviewers, and Finance.
+            Reference view. Access is enforced on the server by two roles and cannot be changed from this screen.
           </p>
+          <ul className="text-xs text-zinc-400 mt-2 space-y-0.5 list-disc pl-4">
+            <li><span className="font-semibold text-zinc-200">Super Admin</span>: everything, including credits, pricing, packages and refunds.</li>
+            <li><span className="font-semibold text-zinc-200">Admin</span>: data work (import, validation, publishing) with read-only access to credits and refunds.</li>
+          </ul>
         </div>
 
         <div className="flex items-center gap-3">
@@ -151,15 +155,19 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
             </span>
           )}
           <button
+            disabled
+            title="Roles are fixed on the server and cannot be created here"
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-3.5 py-2 text-sm font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition"
+            className="flex items-center gap-2 px-3.5 py-2 text-sm font-semibold rounded-lg bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed opacity-60"
           >
             <Plus className="w-4 h-4" />
             Create Role
           </button>
           <button
+            disabled
+            title="Read-only: nothing here is stored or enforced"
             onClick={handleSaveRoleMatrix}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 transition shadow"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-zinc-100 text-zinc-950 shadow cursor-not-allowed opacity-50"
           >
             <Save className="w-4 h-4" />
             Save Changes
@@ -262,7 +270,9 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
                             type="checkbox"
                             checked={Boolean(perms.read)}
                             onChange={() => handleTogglePermission(mod.moduleKey, 'read')}
-                            className="w-4 h-4 rounded accent-zinc-200 cursor-pointer"
+                            disabled
+                            title="Read-only: access is enforced on the server by role"
+                            className="w-4 h-4 rounded accent-zinc-200 cursor-not-allowed opacity-70"
                           />
                         </td>
 
@@ -272,7 +282,9 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
                             type="checkbox"
                             checked={Boolean(perms.write)}
                             onChange={() => handleTogglePermission(mod.moduleKey, 'write')}
-                            className="w-4 h-4 rounded accent-zinc-200 cursor-pointer"
+                            disabled
+                            title="Read-only: access is enforced on the server by role"
+                            className="w-4 h-4 rounded accent-zinc-200 cursor-not-allowed opacity-70"
                           />
                         </td>
 
@@ -282,7 +294,9 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
                             type="checkbox"
                             checked={Boolean(perms.delete)}
                             onChange={() => handleTogglePermission(mod.moduleKey, 'delete')}
-                            className="w-4 h-4 rounded accent-zinc-200 cursor-pointer"
+                            disabled
+                            title="Read-only: access is enforced on the server by role"
+                            className="w-4 h-4 rounded accent-zinc-200 cursor-not-allowed opacity-70"
                           />
                         </td>
 
@@ -292,7 +306,9 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
                             type="checkbox"
                             checked={Boolean(perms.export)}
                             onChange={() => handleTogglePermission(mod.moduleKey, 'export')}
-                            className="w-4 h-4 rounded accent-zinc-200 cursor-pointer"
+                            disabled
+                            title="Read-only: access is enforced on the server by role"
+                            className="w-4 h-4 rounded accent-zinc-200 cursor-not-allowed opacity-70"
                           />
                         </td>
 
@@ -302,7 +318,9 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
                             type="checkbox"
                             checked={Boolean(perms.admin)}
                             onChange={() => handleTogglePermission(mod.moduleKey, 'admin')}
-                            className="w-4 h-4 rounded accent-zinc-200 cursor-pointer"
+                            disabled
+                            title="Read-only: access is enforced on the server by role"
+                            className="w-4 h-4 rounded accent-zinc-200 cursor-not-allowed opacity-70"
                           />
                         </td>
 
@@ -310,8 +328,10 @@ export const RolesPermissionsView: React.FC<RolesPermissionsViewProps> = ({
                         <td className="py-3.5 px-4 text-right font-sans">
                           <button
                             type="button"
+                            disabled
+                            title="Read-only: access is enforced on the server by role"
                             onClick={() => handleToggleRow(mod.moduleKey, !allChecked)}
-                            className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-100 transition"
+                            className="text-[11px] font-semibold text-zinc-600 cursor-not-allowed"
                           >
                             {allChecked ? 'Uncheck All' : 'Grant All'}
                           </button>

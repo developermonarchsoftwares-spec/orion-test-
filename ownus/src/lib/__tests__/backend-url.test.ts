@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { backendBaseUrl, hasRemoteBackend, DEFAULT_LOCAL_BACKEND } from '../backend-url.ts';
+import { backendBaseUrl, hasRemoteBackend, describeBackendTarget, DEFAULT_LOCAL_BACKEND } from '../backend-url.ts';
+
+test('describeBackendTarget reports the source and flags a hosted deployment that fell back to localhost', () => {
+  assert.deepEqual(describeBackendTarget({ ORION_API_URL: 'https://api-x.vercel.internal' }), { source: 'service-binding', host: 'api-x.vercel.internal', misconfigured: false });
+  assert.deepEqual(describeBackendTarget({ BACKEND_API_URL: 'https://api.example.com/api/v1' }), { source: 'BACKEND_API_URL', host: 'api.example.com', misconfigured: false });
+  assert.equal(describeBackendTarget({ VERCEL: '1' }).misconfigured, true);
+  assert.equal(describeBackendTarget({ NODE_ENV: 'production' }).source, 'default-local');
+  assert.equal(describeBackendTarget({}).misconfigured, false); // plain local development
+  assert.equal(describeBackendTarget({ VERCEL: '1', BACKEND_API_URL: 'http://localhost:4000/api/v1' }).misconfigured, true);
+});
 
 test('a Vercel service binding wins and gets the API prefix appended', () => {
   const env = { ORION_API_URL: 'https://api-abc.vercel.internal/', BACKEND_API_URL: 'http://localhost:4000/api/v1' };

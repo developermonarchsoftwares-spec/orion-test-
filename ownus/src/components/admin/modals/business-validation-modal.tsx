@@ -3,6 +3,7 @@ import { Linkedin } from '@/components/ui/linkedin-icon';
 
 import React, { useState } from 'react';
 import { AdminBusinessRecord, ValidationStatus, BusinessStatus } from '@/types/admin';
+import { assessWebsite } from '@/lib/website-status';
 import {
   X,
   CheckCircle2,
@@ -72,7 +73,15 @@ export function BusinessValidationModal({
         { rule: 'Business Name', field: 'name', status: business.name ? 'passed' : 'failed', message: business.name ? 'Business Name is non-empty and formatted.' : 'Required field missing.', currentValue: business.name || '[BLANK]' },
         { rule: 'Phone Format', field: 'phone', status: business.phoneStatus === 'valid' ? 'passed' : business.phoneStatus === 'warning' ? 'warning' : 'failed', message: 'Valid Indian +91 format with verified carrier prefix.', currentValue: business.phone },
         { rule: 'Email Syntax & MX', field: 'email', status: business.emailStatus === 'valid' ? 'passed' : business.emailStatus === 'warning' ? 'warning' : 'failed', message: 'Syntax verified against standard RFC 5322.', currentValue: business.email || 'None' },
-        { rule: 'Website URL & Reachability', field: 'website', status: business.websiteStatus === 'valid' ? 'passed' : business.websiteStatus === 'missing' ? 'warning' : 'failed', message: business.website ? 'Valid HTTPS URL structure.' : 'Website missing (lead opportunity).', currentValue: business.website || 'None' },
+        {
+          rule: 'Website URL & Reachability',
+          field: 'website',
+          // one shared rule (lib/website-status.ts): https:// of any domain extension passes, http:// or a missing website warns,
+          // anything malformed fails. Reachability itself is not checked here.
+          status: ((w) => (w.status === 'valid' ? 'passed' : w.status === 'invalid' ? 'failed' : 'warning'))(assessWebsite(business.website)),
+          message: assessWebsite(business.website).message,
+          currentValue: business.website || 'None',
+        },
         { rule: 'LinkedIn Profile Availability', field: 'linkedin_url', status: (business.linkedin || (business as any).linkedin_url || (business as any).linkedInUrl) ? 'passed' : 'warning', message: (business.linkedin || (business as any).linkedin_url || (business as any).linkedInUrl) ? 'Valid LinkedIn URL recorded.' : 'LinkedIn profile missing.', currentValue: business.linkedin || (business as any).linkedin_url || (business as any).linkedInUrl || 'None' },
         { rule: 'Pincode 6 Digits', field: 'pincode', status: business.pincode && business.pincode.length === 6 ? 'passed' : 'failed', message: 'Must be exact 6 numeric digits matching India Post master.', currentValue: business.pincode },
         { rule: 'State & District Hierarchy', field: 'state', status: 'passed', message: `${business.district} belongs to ${business.state}.`, currentValue: `${business.district}, ${business.state}` },

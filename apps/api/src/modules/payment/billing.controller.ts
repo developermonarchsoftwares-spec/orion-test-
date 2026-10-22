@@ -49,9 +49,10 @@ export class BillingController {
 
   @UseGuards(JwtAuthGuard)
   @Get('invoices/:id')
-  @ApiOperation({ summary: 'One invoice (JSON)' })
-  invoice(@CurrentUser() user: IJwtPayload, @Param('id') id: string) {
-    return this.billing.getInvoice(user.sub, id);
+  @ApiOperation({ summary: 'One invoice (JSON), with the seller details the PDF needs' })
+  async invoice(@CurrentUser() user: IJwtPayload, @Param('id') id: string) {
+    const inv = await this.billing.getInvoice(user.sub, id);
+    return { ...inv, seller: this.billing.sellerDetails() };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -68,7 +69,7 @@ export class BillingController {
   // ---- admin ----
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(UserRole.SUPER_ADMIN) // refunds move money: super administrator only (listing refunds stays open to ADMIN)
   @Post('admin/refunds')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Admin: refund a credited payment in full (reverses credits, marks the invoice, records the refund)' })

@@ -99,7 +99,7 @@ export function DataValidationView({
       const matchesState = selectedState === 'all' || r.state === selectedState;
       const matchesIndustry = selectedIndustry === 'all' || r.industry === selectedIndustry;
       const matchesErrorToggle = !filterOnlyErrors || r.validationScore < 60 || r.validationStatus === 'Rejected';
-      const matchesWarningToggle = !filterOnlyWarnings || r.validationStatus === 'Warning' || r.phoneStatus === 'warning' || r.websiteStatus === 'missing';
+      const matchesWarningToggle = !filterOnlyWarnings || r.validationStatus === 'Warning' || r.phoneStatus === 'warning' || r.websiteStatus === 'missing' || r.websiteStatus === 'warning';
 
       return matchesSearch && matchesStatus && matchesState && matchesIndustry && matchesErrorToggle && matchesWarningToggle;
     });

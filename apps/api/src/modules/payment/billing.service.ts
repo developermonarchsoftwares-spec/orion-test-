@@ -28,6 +28,13 @@ const esc = (v: unknown) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
+/** Who issued the invoice. Comes from configuration only; nothing is invented. A plain function (no `this`) so rendering needs no service instance. */
+const sellerFromEnv = (): { name: string; address: string; taxId: string } => ({
+  name: process.env.INVOICE_SELLER_NAME || process.env.APP_NAME || 'Orion',
+  address: process.env.INVOICE_SELLER_ADDRESS || '',
+  taxId: process.env.INVOICE_SELLER_TAX_ID || '',
+});
+
 const rupees = (paise: number, currency = 'INR') => `${currency === 'INR' ? '₹' : currency + ' '}${(paise / 100).toFixed(2)}`;
 
 export interface IRecordCreditedInput {
@@ -228,13 +235,14 @@ export class BillingService {
     return row;
   }
 
+  /** Who issued the invoice. Comes from configuration only; nothing is invented. Shared by the HTML invoice and the PDF the website builds. */
+  sellerDetails(): { name: string; address: string; taxId: string } {
+    return sellerFromEnv();
+  }
+
   /** Printable invoice (browser "Save as PDF"). Seller details come from configuration; nothing is invented. */
   renderInvoiceHtml(inv: typeof schema.invoices.$inferSelect): string {
-    const seller = {
-      name: process.env.INVOICE_SELLER_NAME || process.env.APP_NAME || 'Orion',
-      address: process.env.INVOICE_SELLER_ADDRESS || '',
-      taxId: process.env.INVOICE_SELLER_TAX_ID || '',
-    };
+    const seller = sellerFromEnv();
     const refunded = inv.status === 'REFUNDED';
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(inv.invoiceNumber)}</title>
 <style>body{font:14px/1.5 system-ui,sans-serif;max-width:720px;margin:32px auto;padding:0 16px;color:#111}h1{font-size:22px;margin:0}

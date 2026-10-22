@@ -106,7 +106,13 @@ describe('Billing: plans, checkout, invoices, top-up, tiers, credit warnings, re
       await buy(a, 'starter');
       const inv = unwrap(await api().get('/api/v1/billing/invoices').set(a.auth))[0];
 
-      expect((await api().get(`/api/v1/billing/invoices/${inv.id}`).set(a.auth)).status).toBe(200);
+      const one = await api().get(`/api/v1/billing/invoices/${inv.id}`).set(a.auth);
+      expect(one.status).toBe(200);
+      // the website builds the PDF from this record: it carries everything the PDF prints, including who issued the invoice
+      const body = unwrap(one);
+      expect(body).toEqual(expect.objectContaining({ invoiceNumber: inv.invoiceNumber, billingEmail: expect.any(String), paymentId: expect.any(String), totalPaise: expect.any(Number) }));
+      expect(typeof body.seller?.name).toBe('string');
+      expect(body.seller.name.length).toBeGreaterThan(0);
       expect((await api().get(`/api/v1/billing/invoices/${inv.id}`).set(b.auth)).status).toBe(404);
       expect((await api().get(`/api/v1/billing/invoices/${inv.id}/html`).set(b.auth)).status).toBe(404);
       expect((await api().get('/api/v1/billing/invoices/not-a-uuid').set(a.auth)).status).toBe(404);

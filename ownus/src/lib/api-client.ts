@@ -362,6 +362,30 @@ export class ApiClient {
     createOrder: (dto: any) => this.request('/payments/create-order', { method: 'POST', body: JSON.stringify(dto) }),
     verify: (dto: any) => this.request('/payments/verify', { method: 'POST', body: JSON.stringify(dto) }),
     getHistory: () => this.request('/payments/history'),
+    /** The signed-in customer's real invoices (issued by the server when a payment is credited). */
+    listInvoices: () => this.request('/billing/invoices'),
+    /**
+     * Downloads one real invoice as a PDF file. The invoice comes from the server (GET /billing/invoices/:id, the user's own record) and the PDF
+     * is drawn from it in the browser, so nothing on it is typed in by the page. The PDF library is loaded only when this is clicked.
+     */
+    downloadInvoicePdf: async (invoiceId: string, invoiceNumber: string) => {
+      let invoice: any;
+      try {
+        invoice = await this.request(`/billing/invoices/${encodeURIComponent(invoiceId)}`);
+      } catch (err: any) {
+        throw new Error(err?.message || 'The invoice could not be loaded, so no PDF was created.');
+      }
+      if (!invoice || typeof invoice !== 'object' || !invoice.invoiceNumber) {
+        throw new Error('The invoice could not be loaded, so no PDF was created.');
+      }
+      try {
+        const { buildInvoicePdf, invoicePdfFileName } = await import('./invoice-pdf');
+        buildInvoicePdf(invoice).save(invoicePdfFileName(invoice.invoiceNumber || invoiceNumber));
+      } catch {
+        throw new Error('The PDF could not be created. Please try again.');
+      }
+      return true;
+    },
     downloadInvoice: async (tx: any) => {
       const baseUrl = getApiBaseUrl();
       const params = new URLSearchParams({

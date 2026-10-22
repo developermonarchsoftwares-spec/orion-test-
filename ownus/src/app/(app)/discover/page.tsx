@@ -50,6 +50,7 @@ import { SaveSearchModal } from '@/components/discover/save-search-modal';
 import { useAuth } from '@/lib/auth-context';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { applySavedFilters } from '@/lib/saved-search-summary';
 
 import { usePublishedBusinesses } from '@/lib/published-businesses-store';
 import {
@@ -88,6 +89,27 @@ export default function DiscoverPage() {
   const [activeChips, setActiveChips] = useState<string[]>([]);
   const [filters, setFilters] = useState<DiscoverFilterState>(initialFilterState);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // "Run Search" on the dashboard and on Saved Searches opens /discover?savedSearchId=<id>: load that saved search and apply its filters
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const savedSearchId = new URLSearchParams(window.location.search).get('savedSearchId');
+    if (!savedSearchId) return;
+    let active = true;
+    apiClient.savedSearches
+      .get(savedSearchId)
+      .then((saved: any) => {
+        if (!active || !saved?.filters) return;
+        setFilters(applySavedFilters(initialFilterState as unknown as Record<string, unknown>, saved.filters) as unknown as DiscoverFilterState);
+        toast.success(`Applied saved search "${saved.name}".`);
+      })
+      .catch(() => {
+        if (active) toast.error('That saved search could not be loaded.');
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
   
   // Table Sorting, Selection & Pagination State
   const [sortOption, setSortOption] = useState<SortOption>('highest_orion_score');

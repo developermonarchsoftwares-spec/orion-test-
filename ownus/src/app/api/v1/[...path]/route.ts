@@ -4,7 +4,9 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from 'next/server';
-import { backendBaseUrl, hasRemoteBackend } from '@/lib/backend-url';
+import { backendBaseUrl, describeBackendTarget, hasRemoteBackend } from '@/lib/backend-url';
+import { headersForApi, trustedForwardedFor } from '@/lib/client-ip';
+import { assessWebsite } from '@/lib/website-status';
 import { isPublishStatus, PUBLISH_REFUSED_REASON, refusedLookupSql, statusUpdateSql } from '@/lib/publish-guard';
 import crypto from 'crypto';
 import { findAdminAccount, fixedOtpAllowed } from '@/lib/admin-account';
@@ -1195,11 +1197,17 @@ async function forwardImportSubmit(req: NextRequest): Promise<NextResponse> {
     const v = req.headers.get(h);
     if (v) headers.set(h, v);
   }
+  const platformIp = trustedForwardedFor(req.headers);
+  if (platformIp) headers.set('x-forwarded-for', platformIp);
   let upstream: Response;
   try {
     upstream = await fetch(`${getBackendUrl()}/admin/import/submit`, { method: 'POST', headers, body: JSON.stringify(payload) });
   } catch (err) {
-    console.error('[Admin Import] API unreachable:', (err as Error)?.message);
+    const target = describeBackendTarget();
+    console.error(
+      `[Admin Import] API unreachable (${(err as Error)?.message}; target ${target.host}, set by ${target.source}).` +
+        (target.misconfigured ? ' This deployment has no API address: set BACKEND_API_URL, or deploy with the services config in vercel.json so ORION_API_URL is injected.' : ''),
+    );
     return NextResponse.json(
       { success: false, statusCode: 503, errorCode: 'BACKEND_UNAVAILABLE', message: 'The import service is unavailable. Nothing was imported; please try again.', timestamp: new Date().toISOString() },
       { status: 503 },
@@ -2676,7 +2684,7 @@ async function proxyRequest(
         const targetUrl = new URL(`${backendBase}/${fullPath}${req.nextUrl.search}`);
         const upstreamRes = await fetch(targetUrl.toString(), {
           method: req.method,
-          headers: req.headers,
+          headers: headersForApi(req.headers),
           body: await req.clone().arrayBuffer(),
         });
         if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
@@ -2695,7 +2703,7 @@ async function proxyRequest(
         const targetUrl = new URL(`${backendBase}/${fullPath}${req.nextUrl.search}`);
         const upstreamRes = await fetch(targetUrl.toString(), {
           method: req.method,
-          headers: req.headers,
+          headers: headersForApi(req.headers),
           body: await req.clone().arrayBuffer(),
         });
         if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
@@ -2724,7 +2732,7 @@ async function proxyRequest(
         const targetUrl = new URL(`${backendBase}/${fullPath}${req.nextUrl.search}`);
         const upstreamRes = await fetch(targetUrl.toString(), {
           method: req.method,
-          headers: req.headers,
+          headers: headersForApi(req.headers),
           body: await req.clone().arrayBuffer(),
         });
         if (upstreamRes.ok) return upstreamRes as any;
@@ -3466,11 +3474,11 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
         validationStatus: r.is_verified ? 'Approved' : 'Validated',
         phoneStatus: r.phone ? 'valid' : 'missing',
         emailStatus: r.email ? 'valid' : 'missing',
-        websiteStatus: r.website ? 'valid' : 'missing',
+        websiteStatus: assessWebsite(r.website).status,
         validationScore: r.is_verified ? 95 : 85,
         opportunityScore: 80,
         dataQualityScore: 90,
-        hasWebsite: Boolean(r.website),
+        hasWebsite: assessWebsite(r.website).hasWebsite,
         missingFields: [],
         validationErrors: [],
         reviewer: 'Monarch Administrator',
@@ -3622,7 +3630,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
         const bodyBuffer = await req.clone().arrayBuffer().catch(() => undefined);
         const upstreamRes = await fetch(targetUrl.toString(), {
           method: req.method,
-          headers: req.headers,
+          headers: headersForApi(req.headers),
           body: bodyBuffer,
         });
         if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
@@ -3641,7 +3649,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
         const bodyBuffer = await req.clone().arrayBuffer().catch(() => undefined);
         const upstreamRes = await fetch(targetUrl.toString(), {
           method: req.method,
-          headers: req.headers,
+          headers: headersForApi(req.headers),
           body: bodyBuffer,
         });
         if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
@@ -3660,7 +3668,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
         const bodyBuffer = await req.clone().arrayBuffer().catch(() => undefined);
         const upstreamRes = await fetch(targetUrl.toString(), {
           method: req.method,
-          headers: req.headers,
+          headers: headersForApi(req.headers),
           body: bodyBuffer,
         });
         if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
@@ -3679,7 +3687,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
         const bodyBuffer = await req.clone().arrayBuffer().catch(() => undefined);
         const upstreamRes = await fetch(targetUrl.toString(), {
           method: req.method,
-          headers: req.headers,
+          headers: headersForApi(req.headers),
           body: bodyBuffer,
         });
         if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
@@ -3698,7 +3706,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
         const bodyBuffer = await req.clone().arrayBuffer().catch(() => undefined);
         const upstreamRes = await fetch(targetUrl.toString(), {
           method: req.method,
-          headers: req.headers,
+          headers: headersForApi(req.headers),
           body: bodyBuffer,
         });
         if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
@@ -3803,6 +3811,8 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
       headers.set(key, val);
     }
   });
+  const platformClientIp = trustedForwardedFor(req.headers);
+  if (platformClientIp) headers.set('x-forwarded-for', platformClientIp);
   headers.set('host', targetUrl.host);
 
   const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip');
@@ -4028,8 +4038,8 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
             slug: 'starter',
             name: 'Starter Pack',
             description: 'Ideal for individual founders, freelancers, and sales reps building focused pipelines.',
-            priceInr: 99,
-            priceAnnualInr: 79,
+            priceInr: 299,
+            priceAnnualInr: 239,
             credits: 100,
             userLimit: 1,
             billingType: 'ONE_TIME',
@@ -4051,8 +4061,8 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
             slug: 'growth',
             name: 'Growth Pack',
             description: 'Best for growing sales teams and agencies looking for rapid pipeline scale.',
-            priceInr: 299,
-            priceAnnualInr: 239,
+            priceInr: 499,
+            priceAnnualInr: 399,
             credits: 350,
             userLimit: 1,
             billingType: 'ONE_TIME',
@@ -4212,42 +4222,12 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
     }
 
     if (fullPath === 'dashboard/summary') {
-      const authHeader = req.headers.get('authorization') || '';
-      const rawToken = authHeader.replace(/^Bearer\s+/i, '');
-      const tokenData = rawToken ? decodeJwtPayload(rawToken) : null;
-      const userIdentifier = tokenData?.sub || null;
-      const wallet = await getOrSyncUserWallet(userIdentifier);
-
-      let unlockedLeadsCount = 0;
-      if (wallet.userId) {
-        const unlockRows = await queryDb(
-          `SELECT count(*)::int as count FROM lead_unlocks WHERE user_id = $1`,
-          [wallet.userId]
-        );
-        unlockedLeadsCount = unlockRows[0]?.count || 0;
-      }
-
-      return NextResponse.json({
-        success: true,
-        statusCode: 200,
-        message: 'Success',
-        data: {
-          wallet: {
-            balance: wallet.balance,
-            dailyCredits: wallet.dailyCredits,
-            purchasedCredits: wallet.purchasedCredits,
-          },
-          stats: {
-            unlockedLeadsCount,
-            savedLeadsCount: 0,
-            savedSearchesCount: 0,
-            newBusinessesCount: 0,
-          },
-          recentSearches: [],
-          recentLeads: [],
-        },
-        timestamp: new Date().toISOString(),
-      });
+      // The dashboard summary is computed by the API from the database. The gateway keeps no second copy of it: with the API unreachable it
+      // says so, instead of answering with invented zeros that the page would show as real numbers.
+      return NextResponse.json(
+        { success: false, statusCode: 503, errorCode: 'DASHBOARD_UNAVAILABLE', message: 'The dashboard data is temporarily unavailable. Please try again.', timestamp: new Date().toISOString() },
+        { status: 503 },
+      );
     }
 
     if (fullPath === 'settings') {

@@ -72,6 +72,7 @@ import { syncAdminRecordsToPublishedStore } from '@/lib/published-businesses-sto
 
 // Layout components
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
+import { roleFromToken, canAccessRoles, type AdminRole } from '@/lib/admin-session-role';
 import { AdminHeader } from '@/components/admin/admin-header';
 
 // View components - Module 1 & 2 & 3
@@ -117,6 +118,8 @@ export default function AdminPortalPage() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
   const [adminEmail, setAdminEmail] = useState<string>('');
+  // which administrator role is signed in (from the session token; decides what is shown, the server re-checks every action)
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [authStep, setAuthStep] = useState<'email' | 'otp'>('email');
   const [inputEmail, setInputEmail] = useState<string>('');
   const [otpCode, setOtpCode] = useState<string>('');
@@ -186,6 +189,7 @@ export default function AdminPortalPage() {
 
     if (token && storedEmail && isAuthEmail(storedEmail)) {
       setAdminEmail(storedEmail.trim().toLowerCase());
+      setAdminRole(roleFromToken(token));
       setIsAdminAuthenticated(true);
     } else {
       // a code was sent shortly before this page was refreshed or reopened: go straight back to the code step
@@ -303,6 +307,7 @@ export default function AdminPortalPage() {
         localStorage.setItem('orion_admin_email', cleanEmail);
       }
       setAdminEmail(cleanEmail);
+      setAdminRole(roleFromToken(data.data.adminToken));
       setIsAdminAuthenticated(true);
       showToast(`Welcome, Administrator (${cleanEmail}).`);
     } catch (err: any) {
@@ -324,6 +329,7 @@ export default function AdminPortalPage() {
       localStorage.removeItem('orion_admin_email');
     }
     setIsAdminAuthenticated(false);
+    setAdminRole(null);
     setAuthStep('email');
     setOtpCode('');
     setAuthError(null);
@@ -500,6 +506,10 @@ export default function AdminPortalPage() {
 
   const handleApproveRecord = (id: string) => {
     handleStatusChange(id, 'approved');
+    // like Reject and Delete: once the record is approved the validation window closes (the grid behind it already shows the new status)
+    if (selectedRecordForValidation && selectedRecordForValidation.id === id) {
+      setSelectedRecordForValidation(null);
+    }
   };
 
   const handleRejectRecord = (id: string) => {
@@ -1239,6 +1249,7 @@ export default function AdminPortalPage() {
         badgeCounts={counts}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+        isSuperAdmin={canAccessRoles(adminRole)}
       />
 
       {/* Main Content Area */}
@@ -1389,11 +1400,19 @@ export default function AdminPortalPage() {
             )}
 
             {activeTab === 'roles' && (
-              <RolesPermissionsView
-                roles={roles}
-                onUpdateRole={handleUpdateRole}
-                onCreateRole={handleCreateRole}
-              />
+              canAccessRoles(adminRole) ? (
+                <RolesPermissionsView
+                  roles={roles}
+                  onUpdateRole={handleUpdateRole}
+                  onCreateRole={handleCreateRole}
+                />
+              ) : (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 text-center" role="alert">
+                  <ShieldCheck className="w-8 h-8 text-zinc-500 mx-auto mb-3" />
+                  <h2 className="text-lg font-bold text-zinc-100">Access denied</h2>
+                  <p className="text-sm text-zinc-400 mt-1">Roles &amp; Permissions is available to the Super Admin only.</p>
+                </div>
+              )
             )}
 
             {activeTab === 'settings' && (

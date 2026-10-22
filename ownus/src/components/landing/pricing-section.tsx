@@ -31,8 +31,8 @@ export function PricingSection() {
       name: "Starter Pack",
       id: "tier-starter",
       href: "/register",
-      priceMonthly: "₹99",
-      priceAnnual: "₹79",
+      priceMonthly: "₹299",
+      priceAnnual: "₹239",
       periodText: "/pack",
       description: "For individual founders and sales reps building targeted lead lists.",
       features: [
@@ -50,8 +50,8 @@ export function PricingSection() {
       name: "Growth Pack",
       id: "tier-growth",
       href: "/register",
-      priceMonthly: "₹299",
-      priceAnnual: "₹239",
+      priceMonthly: "₹499",
+      priceAnnual: "₹399",
       periodText: "/pack",
       description: "Ideal for growing sales teams scaling outbound client acquisition.",
       features: [

@@ -47,6 +47,8 @@ interface AdminSidebarProps {
   };
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  /** Only a Super Admin sees "Roles & Permissions". Defaults to false, so the entry stays hidden unless this is passed as true. */
+  isSuperAdmin?: boolean;
 }
 
 interface NavItem {
@@ -68,7 +70,8 @@ export function AdminSidebar({
   onSelectTab,
   badgeCounts,
   isCollapsed,
-  onToggleCollapse
+  onToggleCollapse,
+  isSuperAdmin = false
 }: AdminSidebarProps) {
   const navSections: NavSection[] = [
     {
@@ -167,7 +170,7 @@ export function AdminSidebar({
                 {section.group}
               </div>
             )}
-            {section.items.map((item) => {
+            {section.items.filter((item) => item.id !== 'roles' || isSuperAdmin).map((item) => {
               const isActive = activeTab === item.id;
               const Icon = item.icon;
               return (

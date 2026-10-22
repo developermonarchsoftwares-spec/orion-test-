@@ -80,7 +80,7 @@ export class CreditController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(UserRole.SUPER_ADMIN) // money: prices and packages are changed by a super administrator only
   @Post('admin/packages')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: Create new credit package' })
@@ -89,7 +89,7 @@ export class CreditController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   @Put('admin/packages/:id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: Update credit package' })
@@ -98,7 +98,7 @@ export class CreditController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   @Delete('admin/packages/:id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: Delete credit package' })
@@ -107,7 +107,7 @@ export class CreditController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   @Put('admin/config')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: Update pricing settings config' })
@@ -116,7 +116,7 @@ export class CreditController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Roles(UserRole.SUPER_ADMIN) // an ordinary administrator can no longer credit any wallet, including their own
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post('admin/adjust')
   @ApiBearerAuth()

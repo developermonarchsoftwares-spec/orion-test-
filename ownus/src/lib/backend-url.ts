@@ -24,6 +24,24 @@ export function backendBaseUrl(env: Env = process.env): string {
 }
 
 /**
+ * Where the API address came from and whether it can possibly work, for log lines only (never the full URL, which may carry a path).
+ * `default-local` on a hosted deployment (Vercel sets `VERCEL`) means nothing was configured: 127.0.0.1 inside a serverless function is
+ * never the API, so every request to it fails with "fetch failed".
+ */
+export function describeBackendTarget(env: Env = process.env): { source: 'service-binding' | 'BACKEND_API_URL' | 'NEST_API_URL' | 'default-local'; host: string; misconfigured: boolean } {
+  const source = clean(env.ORION_API_URL) ? 'service-binding' : clean(env.BACKEND_API_URL) ? 'BACKEND_API_URL' : clean(env.NEST_API_URL) ? 'NEST_API_URL' : 'default-local';
+  let host = 'unknown';
+  try {
+    host = new URL(backendBaseUrl(env)).host;
+  } catch {
+    // keep "unknown"
+  }
+  const local = /^(127\.0\.0\.1|localhost|\[::1\])(:|$)/.test(host);
+  const hosted = !!env.VERCEL || env.NODE_ENV === 'production';
+  return { source, host, misconfigured: hosted && local };
+}
+
+/**
  * True when the API is a real remote service (a Vercel service binding, or an explicitly configured non-local URL). The gateway proxies
  * the credential routes to it first and falls back to its own handlers only when it is unreachable; against a local API it uses its own.
  */

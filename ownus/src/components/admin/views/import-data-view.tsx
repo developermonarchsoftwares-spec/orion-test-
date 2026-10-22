@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { ORION_SUPPORTED_FIELDS } from '@/lib/admin-mock-data';
 import { apiClient } from '@/lib/api-client';
+import { assessWebsite } from '@/lib/website-status';
 import { getAdminAccessToken, ADMIN_SESSION_EXPIRED_EVENT } from '@/lib/admin-fetch';
 import { cn } from '@/lib/utils';
 import { AdminBusinessRecord, DuplicatePair } from '@/types/admin';
@@ -594,6 +595,9 @@ export function ImportDataView({ onImportComplete }: ImportDataViewProps) {
       const pincodeVal = String(row.pincode || row.Pincode || row.zipCode || '').trim();
       const phoneVal = row.phone || row.Phone || row['Phone Number'] || row.contact_number || '';
       const emailVal = row.email || row.Email || row['Email Address'] || '';
+      // read once, from either spelling of the column, so the value, the status and hasWebsite always agree
+      const websiteCheck = assessWebsite(row.website || row.Website || '');
+      const websiteVal = websiteCheck.value;
 
       return {
         id: `BIZ-IMP-${1000 + i}`,
@@ -610,16 +614,16 @@ export function ImportDataView({ onImportComplete }: ImportDataViewProps) {
         pincode: pincodeVal,
         phone: String(phoneVal),
         email: String(emailVal),
-        website: String(row.website || row.Website || ''),
+        website: websiteVal,
         status: 'draft',
         validationStatus: 'Pending',
         phoneStatus: phoneVal ? 'valid' : 'missing',
         emailStatus: emailVal ? 'valid' : 'missing',
-        websiteStatus: row.website ? 'valid' : 'missing',
+        websiteStatus: websiteCheck.status,
         validationScore: phoneVal && emailVal ? 82 : 65,
         opportunityScore: 78,
         dataQualityScore: 80,
-        hasWebsite: Boolean(row.website),
+        hasWebsite: websiteCheck.hasWebsite,
         missingFields: !emailVal ? ['Email'] : [],
         validationErrors: [],
         reviewer: 'Unassigned',

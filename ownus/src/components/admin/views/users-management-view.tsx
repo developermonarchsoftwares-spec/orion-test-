@@ -303,13 +303,13 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
           <table className="w-full text-left text-sm text-zinc-300">
             <thead className="bg-zinc-950 text-xs uppercase font-semibold text-zinc-400 border-b border-zinc-800">
               <tr>
-                <th className="py-3.5 px-4">User Name & Company</th>
-                <th className="py-3.5 px-4">Contact Details</th>
-                <th className="py-3.5 px-4">Plan & Role</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4 text-right">Credits</th>
-                <th className="py-3.5 px-4">Registered / Last Login</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-4 whitespace-nowrap align-middle">User Name & Company</th>
+                <th className="py-3.5 px-4 whitespace-nowrap align-middle">Contact Details</th>
+                <th className="py-3.5 px-4 whitespace-nowrap align-middle">Plan & Role</th>
+                <th className="py-3.5 px-4 whitespace-nowrap align-middle">Status</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap align-middle">Credits</th>
+                <th className="py-3.5 px-4 whitespace-nowrap align-middle">Registered / Last Login</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap align-middle">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/60 font-mono text-xs">
@@ -323,7 +323,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
               ) : (
                 filteredUsers.map(user => (
                   <tr key={user.id} className="hover:bg-zinc-800/40 transition">
-                    <td className="py-3.5 px-4 font-sans">
+                    <td className="py-3.5 px-4 font-sans align-middle">
                       <div className="font-semibold text-zinc-100 text-sm">{user.name}</div>
                       <div className="text-xs text-zinc-400 flex items-center gap-1 mt-0.5">
                         <Building className="w-3 h-3 text-zinc-500" />
@@ -331,19 +331,19 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 font-mono text-xs text-zinc-300">
+                    <td className="py-3.5 px-4 font-mono text-xs text-zinc-300 align-middle whitespace-nowrap">
                       <div>{user.email}</div>
                       <div className="text-zinc-400 text-[11px] mt-0.5">{user.phone}</div>
                     </td>
 
-                    <td className="py-3.5 px-4 font-sans">
+                    <td className="py-3.5 px-4 font-sans align-middle whitespace-nowrap">
                       <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-zinc-800 text-zinc-200 border border-zinc-700">
                         {user.plan}
                       </div>
                       <div className="text-[11px] text-zinc-400 mt-1">{user.role}</div>
                     </td>
 
-                    <td className="py-3.5 px-4 font-sans">
+                    <td className="py-3.5 px-4 font-sans align-middle whitespace-nowrap">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                         user.status === 'Active' 
                           ? 'bg-zinc-800 text-zinc-100 border border-zinc-700' 
@@ -356,21 +356,21 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       </span>
                     </td>
 
-                    <td className="py-3.5 px-4 text-right font-sans">
+                    <td className="py-3.5 px-4 text-right font-sans align-middle whitespace-nowrap tabular-nums">
                       <div className="font-bold text-zinc-100 text-sm">
                         {user.credits.toLocaleString()}
                       </div>
                       <div className="text-[10px] text-zinc-400">{user.unlockedCount} unlocked</div>
                     </td>
 
-                    <td className="py-3.5 px-4 text-zinc-400 font-sans text-xs">
+                    <td className="py-3.5 px-4 text-zinc-400 font-sans text-xs align-middle whitespace-nowrap">
                       <div>Reg: {user.registeredDate}</div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> {user.lastLogin}
+                      <div className="text-[11px] text-zinc-500 mt-0.5 flex items-center gap-1 whitespace-nowrap">
+                        <Clock className="w-3 h-3 shrink-0" /> {user.lastLogin}
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 text-right font-sans">
+                    <td className="py-3.5 px-4 text-right font-sans align-middle whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => setSelectedUserForProfile(user)}

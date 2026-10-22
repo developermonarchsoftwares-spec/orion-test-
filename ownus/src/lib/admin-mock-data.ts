@@ -236,7 +236,7 @@ export const INITIAL_CREDIT_PACKAGES: CreditPackage[] = [
     id: 'pack-starter',
     name: 'Starter Pack',
     credits: 100,
-    price: 99,
+    price: 299,
     discountPercentage: 0,
     features: ['100 Verified Business Unlocks', 'CSV / Excel Export', 'Standard Email Support', 'Credits Never Expire']
   },
@@ -244,7 +244,7 @@ export const INITIAL_CREDIT_PACKAGES: CreditPackage[] = [
     id: 'pack-growth',
     name: 'Growth Pack',
     credits: 350,
-    price: 299,
+    price: 499,
     discountPercentage: 20,
     isPopular: true,
     features: ['350 Verified Business Unlocks', 'Direct Phone & WhatsApp Access', 'Priority Verification Queue', 'Credits Never Expire']
