@@ -41,7 +41,7 @@ export function buildPoolConfig(env: Record<string, string | undefined> = proces
     ssl: isLocalDatabaseUrl(dbUrl) ? false : { rejectUnauthorized: true },
     max: 3,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 10000, // a suspended Neon compute needs a few seconds to wake
     statement_timeout: 20000,
   };
 }

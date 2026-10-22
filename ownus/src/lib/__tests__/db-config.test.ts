@@ -39,7 +39,7 @@ describe('gateway database connection configuration', () => {
     const c = buildPoolConfig({ DATABASE_URL: remote })!;
     assert.equal(c.max, 3);
     assert.equal(c.statement_timeout, 20000);
-    assert.equal(c.connectionTimeoutMillis, 5000);
+    assert.equal(c.connectionTimeoutMillis, 10000);
   });
 
   it('never carries a certificate-verification bypass in source', async () => {

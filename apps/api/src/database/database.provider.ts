@@ -4,6 +4,7 @@ import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 import { verifiedConnection } from './tls';
+import { apiEndpoint, apiMaxConnections } from './connection-endpoint';
 import { databasePoolSettings } from './pool-settings';
 import { instrumentPool } from '../common/observability/db-instrumentation';
 import { DRIZZLE_DATABASE, PG_POOL } from './database.constants';
@@ -16,12 +17,12 @@ export const databaseProviders: Provider[] = [
     inject: [ConfigService],
     useFactory: (configService: ConfigService): Pool => {
       const databaseUrl = configService.get<string>('database.url');
-      const maxConnections = configService.get<number>('database.maxConnections', 20);
+      const maxConnections = apiMaxConnections(configService.get<number>('database.maxConnections', 20));
       const idleTimeoutMillis = configService.get<number>('database.idleTimeoutMs', 30000);
 
       const pool = new Pool({
         // TLS is always verified for a remote database; the URL's own sslmode cannot weaken it (see ./tls)
-        ...(databaseUrl ? verifiedConnection(databaseUrl) : { connectionString: databaseUrl }),
+        ...(databaseUrl ? verifiedConnection(apiEndpoint(databaseUrl)) : { connectionString: databaseUrl }),
         max: maxConnections,
         idleTimeoutMillis,
         connectionTimeoutMillis: 15000,
