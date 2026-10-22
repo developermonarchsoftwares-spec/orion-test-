@@ -8,6 +8,13 @@
  */
 export const restoreMode = (env: NodeJS.ProcessEnv = process.env): boolean => (env.RESTORE_MODE ?? '').trim().toLowerCase() === 'true';
 
-/** True when a background job owned by `disableFlag` must not start: tests, its own DISABLE_ flag, or restore mode. */
+/**
+ * True on Vercel, where the API runs as a function: an in-process timer only fires while an instance happens to be alive, so it can be
+ * late, skipped or run on several instances. There the jobs are run by authenticated Vercel Cron calls (modules/cron) instead.
+ * FORCE_BACKGROUND_JOBS=true turns the timers back on (an always-on host that sets VERCEL for other reasons).
+ */
+export const serverlessRuntime = (env: NodeJS.ProcessEnv = process.env): boolean => !!env.VERCEL && env.FORCE_BACKGROUND_JOBS !== 'true';
+
+/** True when a background job owned by `disableFlag` must not start: tests, its own DISABLE_ flag, restore mode, or a serverless runtime. */
 export const backgroundJobDisabled = (disableFlag?: string, env: NodeJS.ProcessEnv = process.env): boolean =>
-  env.NODE_ENV === 'test' || restoreMode(env) || (!!disableFlag && env[disableFlag] === 'true');
+  env.NODE_ENV === 'test' || restoreMode(env) || serverlessRuntime(env) || (!!disableFlag && env[disableFlag] === 'true');

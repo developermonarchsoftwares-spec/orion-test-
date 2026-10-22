@@ -6,7 +6,7 @@ import { DrizzleDb } from '../../database/database.provider';
 import { queueJobs, QueueJob } from '../../database/schema/queue_jobs';
 import { QUEUE_NAMES, QueueNameType } from './queue.constants';
 import { captureException } from '../../common/observability/error-tracker';
-import { restoreMode } from '../../common/utils/restore-mode';
+import { restoreMode, serverlessRuntime } from '../../common/utils/restore-mode';
 
 export interface IQueueStats {
   queueName: string;
@@ -42,6 +42,9 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('Initializing PostgreSQL Queue Engine...');
     if (restoreMode()) this.logger.warn('RESTORE_MODE: queue workers are not started; waiting jobs stay waiting');
 
+    // Vercel: the cron route prunes and drains the queues instead of a timer
+    if (serverlessRuntime()) return;
+
     // Periodically clean up old completed/failed jobs (> 7 days) every 6 hours
     this.cleanupInterval = setInterval(
       () => {
@@ -63,6 +66,19 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
     // Process any pending jobs waiting in this queue
     setImmediate(() => this.processPendingJobs(queueName));
+  }
+
+  /** Processes the waiting jobs of every registered queue once and waits for them (called by the cron route on Vercel). */
+  async drain(): Promise<{ queues: number }> {
+    if (restoreMode()) return { queues: 0 };
+    const names = [...this.handlers.keys()];
+    await Promise.all(names.map((n) => this.processPendingJobs(n)));
+    return { queues: names.length };
+  }
+
+  /** Removes finished jobs older than 7 days. */
+  prune(): Promise<unknown> {
+    return this.pruneOldJobs();
   }
 
   /**

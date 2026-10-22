@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { CreditRepository } from './credit.repository';
 import { CreditService } from './credit.service';
-import { restoreMode } from '../../common/utils/restore-mode';
+import { restoreMode, serverlessRuntime } from '../../common/utils/restore-mode';
 
 @Injectable()
 export class CreditScheduler implements OnModuleInit, OnModuleDestroy {
@@ -21,6 +21,7 @@ export class CreditScheduler implements OnModuleInit, OnModuleDestroy {
       this.logger.warn('RESTORE_MODE: the daily credit rollover is not running');
       return;
     }
+    if (serverlessRuntime()) return; // Vercel: the daily rollover is run by the cron route
     this.logger.log('CreditScheduler initialized. Starting daily credit rollover worker...');
     this.stopped = false;
     // Initial check after 10 seconds

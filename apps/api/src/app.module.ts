@@ -23,6 +23,8 @@ import { StorageModule } from './modules/storage/storage.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 
+import { CronController } from './modules/cron/cron.controller';
+
 // Domain & Pipeline Modules
 import { BusinessModule } from './modules/business/business.module';
 import { ImportModule } from './modules/import/import.module';
@@ -63,7 +65,7 @@ import { AuthenticationMiddleware } from './auth/auth.middleware';
 import { AppController } from './app.controller';
 
 @Module({
-  controllers: [AppController],
+  controllers: [AppController, CronController],
   imports: [
     // Configuration
     ConfigModule.forRoot({

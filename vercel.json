@@ -25,5 +25,35 @@
         "service": "ownus"
       }
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/v1/cron/webhooks",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/v1/cron/exports",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/v1/cron/queues",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/v1/cron/credit-rollover",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/v1/cron/privacy",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/v1/cron/token-cleanup",
+      "schedule": "30 * * * *"
+    },
+    {
+      "path": "/api/v1/cron/queue-prune",
+      "schedule": "45 */6 * * *"
+    }
   ]
 }

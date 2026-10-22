@@ -45,6 +45,7 @@ const EXPECTED_PUBLIC: string[] = [
   'GET /api/v1/businesses/:id',
   'GET /api/v1/businesses/:id/related',
   'GET /api/v1/credit/config',
+  'GET /api/v1/cron/:job', // Vercel Cron; needs `Bearer CRON_SECRET` (32+ characters), else 401, or 503 when unset
   'GET /api/v1/credit/packages',
   'GET /api/v1/discover/businesses/:slug',
   'GET /api/v1/discover/businesses/:slug/related',

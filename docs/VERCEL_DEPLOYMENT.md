@@ -26,15 +26,23 @@ browser -> https://<domain>/...  ->  ownus (Next.js)
 - **Browser calls:** leave `NEXT_PUBLIC_API_URL` empty; the browser then calls the same origin (`/api/v1`). Bindings work in functions only
   (not in builds or middleware); the gateway uses it only inside the route function.
 
-## Read this first: what changes when the API runs as a function
-Vercel runs each backend service as a Vercel Function on Fluid compute, not as a server that stays up. The API currently starts several
-**in-process timers**, which only run while an instance happens to be alive:
-`credit.scheduler` (daily credit rollover), `export-scheduler.service` (scheduled exports), `webhook-dispatcher.service` (outgoing webhooks,
-every 5 s), `privacy.scheduler` (retention and deletion), `token-cleanup.service`, the `queue` workers (import and people-import jobs), and
-the in-memory monitoring and rate-limit state.
-On Vercel these can be late, skipped or run twice per instance. Before relying on them in production, move them to Vercel Cron or Queues
-(calling an authenticated API route), or run the API on a host that stays up (its `Dockerfile` already exists) and keep only the website on
-Vercel. This is a decision, not a detail: credits, scheduled exports and import processing depend on it.
+## Background jobs on Vercel (Vercel Cron)
+On Vercel (`VERCEL` is set) the API's in-process timers are OFF (`serverlessRuntime()` in `common/utils/restore-mode.ts`; `FORCE_BACKGROUND_JOBS=true`
+turns them back on for an always-on host). The same work is run by Vercel Cron calling authenticated routes, scheduled in the root `vercel.json`:
+
+| Route (`GET /api/v1/cron/<job>`) | Schedule | Replaces |
+|---|---|---|
+| `webhooks` | every minute (loops up to 45 s while deliveries are due) | webhook dispatcher (was every 5 s; retries start at 30 s, so delivery can be up to a minute late) |
+| `exports` | every minute | scheduled exports + expired file removal |
+| `queues` | every minute | import / people-import queue workers (a job is also tried at once when queued, best effort) |
+| `credit-rollover` | hourly | daily credit rollover |
+| `privacy` | hourly :15 | account erasure + retention |
+| `token-cleanup` | hourly :30 | stale token purge |
+| `queue-prune` | every 6 h | old finished queue jobs |
+
+Set **`CRON_SECRET`** (32+ random characters, Sensitive) for Production and Preview. Vercel then sends `Authorization: Bearer $CRON_SECRET`; the route
+answers 503 without a secret, 401 with a wrong one, and nothing runs in `RESTORE_MODE`. Per-minute schedules need a Pro plan (Hobby allows daily crons only).
+Cron requests go through the public site, so they pass the gateway, which forwards them to the API unchanged. NOT yet verified on a real deployment: check a Preview's cron logs.
 
 ## Project settings on Vercel
 - Create the project from the repository with **Root Directory = the repository root** (where `vercel.json` is), not `ownus`. The earlier link in
@@ -55,13 +63,14 @@ Project variables are shared by both services. Set them for **Production and Pre
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_API_MODE=live` | api | Live key in production; `rzp_test_` is refused unless `RAZORPAY_ALLOW_TEST_KEYS=true` (staging) |
 | `TYPESENSE_*`, `MAIL_*`, `NODE_ENV=production`, `APP_URL`, `WEB_APP_URL`, ... | api | Full list: `.env.production.example` |
 | `CORS_ORIGINS` | api | Not needed for browser traffic (the API is internal); keep it set to the site URL anyway |
+| `CRON_SECRET` | api | Authenticates Vercel Cron calls (see Background jobs) |
 | `ORION_API_URL` | web | **Injected by Vercel. Do not set.** |
 | `BACKEND_API_URL`, `NEXT_PUBLIC_API_URL` | web | **Do not set on Vercel** (local/Docker only) |
 
 ## Before the first production deploy (blockers)
 1. **Rotate the JWT secrets and the database password.** The old values are in Git history; production refuses publicly known secrets, so
    deploying with an old value breaks sign-in.
-2. Decide the background-job question above.
+2. Set `CRON_SECRET` and confirm the cron jobs run on a Preview (Pro plan for per-minute schedules).
 3. Run migrations from a trusted machine (`npm run drizzle:migrate` in `apps/api`, with the production `DATABASE_URL`; `npm run db:audit`
    first). Never from Vercel. Migrations `0000`-`0023` are frozen.
 4. Add the production domain to the Google OAuth redirect URIs if Google sign-in is used.

@@ -210,6 +210,7 @@ Owner: role only · Mechanism: ADMIN guard; dashboard page is a shell; metrics n
 | POST | `/monitoring/test-error` | JWT | ...ADMINS | global only | - | - |
 | GET | `/monitoring/traces` | JWT | ...ADMINS | global only | query: raw limit; raw minMs | - |
 | GET | `/monitoring/traces/:traceId` | JWT | ...ADMINS | global only | path: traceId (string) | - |
+| GET | `/cron/:job` | Public | - | global only | - | public route; Vercel Cron; needs `Bearer CRON_SECRET` (32+ chars), else 401 (503 when unset) |
 | GET | `/metrics` | Public | - | global only | - | public route; needs METRICS_TOKEN or an admin bearer token, else 401 |
 
 ## modules/oauth/oauth
