@@ -7,8 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -k -n \"api,web\" -c \"blue,green\" \"npm run start:api\" \"npm run start:web\"",
-    "dev:api": "npm run start:api",
+    "dev": "concurrently -k -n \"api,web\" -c \"blue,green\" \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm --prefix apps/api run start:dev",
     "dev:web": "npm run start:web",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
