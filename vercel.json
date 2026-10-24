@@ -29,31 +29,31 @@
   "crons": [
     {
       "path": "/api/v1/cron/webhooks",
-      "schedule": "* * * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/v1/cron/exports",
-      "schedule": "* * * * *"
+      "schedule": "10 2 * * *"
     },
     {
       "path": "/api/v1/cron/queues",
-      "schedule": "* * * * *"
+      "schedule": "20 2 * * *"
     },
     {
       "path": "/api/v1/cron/credit-rollover",
-      "schedule": "0 * * * *"
+      "schedule": "30 2 * * *"
     },
     {
       "path": "/api/v1/cron/privacy",
-      "schedule": "15 * * * *"
+      "schedule": "40 2 * * *"
     },
     {
       "path": "/api/v1/cron/token-cleanup",
-      "schedule": "30 * * * *"
+      "schedule": "50 2 * * *"
     },
     {
       "path": "/api/v1/cron/queue-prune",
-      "schedule": "45 */6 * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }

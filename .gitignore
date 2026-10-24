@@ -70,3 +70,9 @@ ownus/scratch/
 ownus/scratch_*.js
 # the local-only database helper the scratch scripts and their guard test depend on must stay tracked
 !ownus/scratch_target.js
+
+# Any other local env file (e.g. .env.staging) may hold real secrets; templates (*.example) stay tracked.
+.env.*
+**/.env.*
+!.env.*.example
+!**/.env.*.example

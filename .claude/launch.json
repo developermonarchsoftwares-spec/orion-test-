@@ -11,6 +11,17 @@
         "dev"
       ],
       "port": 3000
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "apps/api",
+        "run",
+        "start:dev"
+      ],
+      "port": 4000
     }
   ]
 }

@@ -2687,7 +2687,7 @@ async function proxyRequest(
           headers: headersForApi(req.headers),
           body: await req.clone().arrayBuffer(),
         });
-        if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
+        if (isDefinitiveUpstream(upstreamRes.status)) return await relayUpstream(upstreamRes);
       } catch {
         // Fall back to native handler
       }
@@ -2706,7 +2706,7 @@ async function proxyRequest(
           headers: headersForApi(req.headers),
           body: await req.clone().arrayBuffer(),
         });
-        if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
+        if (isDefinitiveUpstream(upstreamRes.status)) return await relayUpstream(upstreamRes);
       } catch {
         // Fall back to native handler
       }
@@ -2735,7 +2735,7 @@ async function proxyRequest(
           headers: headersForApi(req.headers),
           body: await req.clone().arrayBuffer(),
         });
-        if (upstreamRes.ok) return upstreamRes as any;
+        if (upstreamRes.ok) return await relayUpstream(upstreamRes);
       } catch {
         // Fall back to native handler
       }
@@ -3633,7 +3633,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
           headers: headersForApi(req.headers),
           body: bodyBuffer,
         });
-        if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
+        if (isDefinitiveUpstream(upstreamRes.status)) return await relayUpstream(upstreamRes);
       } catch {
         // Fall back to native handler
       }
@@ -3652,7 +3652,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
           headers: headersForApi(req.headers),
           body: bodyBuffer,
         });
-        if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
+        if (isDefinitiveUpstream(upstreamRes.status)) return await relayUpstream(upstreamRes);
       } catch {
         // Fall back to native handler
       }
@@ -3671,7 +3671,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
           headers: headersForApi(req.headers),
           body: bodyBuffer,
         });
-        if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
+        if (isDefinitiveUpstream(upstreamRes.status)) return await relayUpstream(upstreamRes);
       } catch {
         // Fall back to native handler
       }
@@ -3690,7 +3690,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
           headers: headersForApi(req.headers),
           body: bodyBuffer,
         });
-        if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
+        if (isDefinitiveUpstream(upstreamRes.status)) return await relayUpstream(upstreamRes);
       } catch {
         // Fall back to native handler
       }
@@ -3709,7 +3709,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
           headers: headersForApi(req.headers),
           body: bodyBuffer,
         });
-        if (isDefinitiveUpstream(upstreamRes.status)) return upstreamRes as any;
+        if (isDefinitiveUpstream(upstreamRes.status)) return await relayUpstream(upstreamRes);
       } catch {
         // Fall back to native handler
       }
@@ -3739,7 +3739,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
           const loc = upstreamRes.headers.get('location');
           if (loc) return NextResponse.redirect(loc);
         }
-        if (upstreamRes.ok) return upstreamRes as any;
+        if (upstreamRes.ok) return await relayUpstream(upstreamRes);
       } catch {
         // Fall back to native handler
       }
@@ -3761,7 +3761,7 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
           const loc = upstreamRes.headers.get('location');
           if (loc) return NextResponse.redirect(loc);
         }
-        if (upstreamRes.ok) return upstreamRes as any;
+        if (upstreamRes.ok) return await relayUpstream(upstreamRes);
       } catch {
         // Fall back to native handler
       }
@@ -4477,6 +4477,19 @@ async function handleDiscoverExport(req: NextRequest): Promise<NextResponse> {
       { status: 503 },
     );
   }
+}
+
+/**
+ * Hands an upstream API response to the browser. fetch() has already decoded a compressed body, so the transport headers of the ORIGINAL body
+ * (content-encoding, content-length, transfer-encoding) must not be copied: sending the decoded bytes under a 'gzip' header makes the browser
+ * fail the whole response ("Failed to fetch"), which happened for any reply large enough for the API to compress, such as register.
+ */
+async function relayUpstream(upstreamRes: Response): Promise<NextResponse> {
+  const headers = new Headers();
+  upstreamRes.headers.forEach((val, key) => {
+    if (!['transfer-encoding', 'connection', 'keep-alive', 'content-encoding', 'content-length'].includes(key.toLowerCase())) headers.set(key, val);
+  });
+  return new NextResponse(await upstreamRes.arrayBuffer(), { status: upstreamRes.status, statusText: upstreamRes.statusText, headers });
 }
 
 /** Entry point for every method: nothing a handler throws reaches the client as a bare, body-less 500, and no error text is echoed. */

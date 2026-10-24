@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-fixtures';
-import { generateTestUser, loginUserViaUI, registerUserViaUI } from '../fixtures/auth-helpers';
+import { generateTestUser, loginUserViaUI, registerUserViaApi, registerUserViaUI } from '../fixtures/auth-helpers';
 
 test.describe('PHASE 8: Credits & Wallet System Testing', () => {
   const knownBusinessSlug = 'secure-enterprise-systems';
@@ -49,16 +49,7 @@ test.describe('PHASE 8: Credits & Wallet System Testing', () => {
   test('8.3 Idempotency: re-unlocking an already unlocked lead does NOT deduct credits again', async ({ page, request }) => {
     const user = generateTestUser();
     // Register user via API
-    const regRes = await request.post('/api/v1/auth/register', {
-      data: {
-        email: user.email,
-        password: user.password,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
-    });
-    const regStatus = regRes.status();
-    const regBody = await regRes.json();
+    const { status: regStatus, body: regBody } = await registerUserViaApi(request, user);
     expect(regStatus, `Registration failed: ${JSON.stringify(regBody)}`).toBe(201);
     const token = regBody.data.tokens.accessToken;
 
@@ -93,16 +84,7 @@ test.describe('PHASE 8: Credits & Wallet System Testing', () => {
 
   test('8.4 Insufficient credits enforcement: returns 402 when balance is zero', async ({ request }) => {
     const brokeUser = generateTestUser();
-    const regRes = await request.post('/api/v1/auth/register', {
-      data: {
-        email: brokeUser.email,
-        password: brokeUser.password,
-        firstName: brokeUser.firstName,
-        lastName: brokeUser.lastName,
-      },
-    });
-    const regStatus = regRes.status();
-    const regBody = await regRes.json();
+    const { status: regStatus, body: regBody } = await registerUserViaApi(request, brokeUser);
     expect(regStatus, `Registration failed: ${JSON.stringify(regBody)}`).toBe(201);
     const token = regBody.data.tokens.accessToken;
 

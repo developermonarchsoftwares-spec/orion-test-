@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-fixtures';
-import { generateTestUser, loginUserViaUI, registerUserViaUI } from '../fixtures/auth-helpers';
+import { MAIL_CAPTURE_URL, generateTestUser, loginUserViaUI, registerUserViaUI } from '../fixtures/auth-helpers';
 
 test.describe('PHASE 3: Authentication & Session Testing', () => {
 
@@ -8,7 +8,7 @@ test.describe('PHASE 3: Authentication & Session Testing', () => {
       await page.goto('/register');
       await page.waitForLoadState('domcontentloaded');
 
-      const submitBtn = page.getByRole('button', { name: /create account/i });
+      const submitBtn = page.getByRole('button', { name: /^continue$/i });
       await expect(submitBtn).toBeDisabled();
 
       // Check terms checkbox
@@ -21,7 +21,7 @@ test.describe('PHASE 3: Authentication & Session Testing', () => {
       await page.waitForLoadState('domcontentloaded');
 
       await page.locator('#terms').check();
-      const submitBtn = page.getByRole('button', { name: /create account/i });
+      const submitBtn = page.getByRole('button', { name: /^continue$/i });
 
       await submitBtn.click();
 
@@ -38,7 +38,7 @@ test.describe('PHASE 3: Authentication & Session Testing', () => {
       await page.locator('#password').fill('SecurePassword123!');
       await page.locator('#terms').check();
 
-      const submitBtn = page.getByRole('button', { name: /create account/i });
+      const submitBtn = page.getByRole('button', { name: /^continue$/i });
       await submitBtn.click();
 
       // HTML5 email constraint prevents navigating away
@@ -77,11 +77,16 @@ test.describe('PHASE 3: Authentication & Session Testing', () => {
       await page.locator('#password').fill(user.password);
       await page.locator('#terms').check();
 
-      const submitBtn = page.getByRole('button', { name: /create account/i });
+      const startedAt = Date.now();
+      const submitBtn = page.getByRole('button', { name: /^continue$/i });
       await submitBtn.click();
 
-      // Expect error notice for existing account (exact check or first match)
-      await expect(page.getByText('Account Already Exists', { exact: true })).toBeVisible({ timeout: 10000 });
+      // Sign-up proves e-mail ownership first and answers the same way for a new and an existing address (no account enumeration):
+      // the code screen appears, but no code is e-mailed for an address that already has an account, so registration cannot proceed.
+      await expect(page.getByRole('heading', { name: /verify your email/i })).toBeVisible({ timeout: 10000 });
+      await page.waitForTimeout(2000);
+      const mail = await page.request.get(`${MAIL_CAPTURE_URL}/otp`, { params: { email: user.email } });
+      if (mail.ok()) expect((await mail.json()).at, 'a new code was e-mailed to an address that already has an account').toBeLessThan(startedAt);
       await expect(page).toHaveURL(/\/register/);
     });
   });

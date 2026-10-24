@@ -50,7 +50,8 @@
     "test:integration": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --runInBand --forceExit --config test/jest-integration.config.js",
     "test:security": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --runInBand --forceExit --config test/jest-security.config.js",
     "test:perf": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --runInBand --forceExit --config test/jest-performance.config.js",
-    "test:regression": "npm run test:unit && npm run test:integration && npm run test:security && npm run test:e2e:all"
+    "test:regression": "npm run test:unit && npm run test:integration && npm run test:security && npm run test:e2e:all",
+    "e2e:seed-fixtures": "ts-node -r tsconfig-paths/register scripts/seed-e2e-fixtures.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",

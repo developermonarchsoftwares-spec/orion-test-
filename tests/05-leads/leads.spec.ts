@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-fixtures';
-import { generateTestUser, loginUserViaUI, registerUserViaUI } from '../fixtures/auth-helpers';
+import { generateTestUser, loginUserViaUI, registerUserViaApi, registerUserViaUI } from '../fixtures/auth-helpers';
 
 test.describe('PHASE 7: Leads Workflow E2E Testing', () => {
   let testUser = generateTestUser();
@@ -7,10 +7,7 @@ test.describe('PHASE 7: Leads Workflow E2E Testing', () => {
   const knownBusinessSlug = 'secure-enterprise-systems';
 
   test.beforeAll(async ({ request }) => {
-    const res = await request.post('/api/v1/auth/register', {
-      data: testUser,
-    });
-    const json = await res.json();
+    const { body: json } = await registerUserViaApi(request, testUser);
     authToken = json?.data?.tokens?.accessToken || json?.tokens?.accessToken;
   });
 

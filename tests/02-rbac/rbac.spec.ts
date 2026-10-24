@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-fixtures';
-import { generateTestUser, loginUserViaUI, loginAdminViaUI, registerUserViaUI, KNOWN_ADMIN } from '../fixtures/auth-helpers';
+import { generateTestUser, loginUserViaUI, loginAdminViaUI, registerUserViaApi, registerUserViaUI, KNOWN_ADMIN } from '../fixtures/auth-helpers';
 
 test.describe('PHASE 4: Authorization & RBAC Testing', () => {
 
@@ -105,29 +105,13 @@ test.describe('PHASE 4: Authorization & RBAC Testing', () => {
       const userB = generateTestUser();
 
       // Register both users via direct API
-      const regA = await request.post('/api/v1/auth/register', {
-        data: {
-          email: userA.email,
-          password: userA.password,
-          firstName: userA.firstName,
-          lastName: userA.lastName,
-        },
-      });
-      expect(regA.status()).toBe(201);
-      const dataA = (await regA.json()).data;
-      const tokenA = dataA.tokens.accessToken;
+      const regA = await registerUserViaApi(request, userA);
+      expect(regA.status).toBe(201);
+      const tokenA = regA.body.data.tokens.accessToken;
 
-      const regB = await request.post('/api/v1/auth/register', {
-        data: {
-          email: userB.email,
-          password: userB.password,
-          firstName: userB.firstName,
-          lastName: userB.lastName,
-        },
-      });
-      expect(regB.status()).toBe(201);
-      const dataB = (await regB.json()).data;
-      const tokenB = dataB.tokens.accessToken;
+      const regB = await registerUserViaApi(request, userB);
+      expect(regB.status).toBe(201);
+      const tokenB = regB.body.data.tokens.accessToken;
 
       // User B creates a saved search using valid CreateSavedSearchDto
       const createSearchRes = await request.post('/api/v1/saved-searches', {

@@ -1,15 +1,12 @@
 import { test, expect } from '../fixtures/test-fixtures';
-import { generateTestUser } from '../fixtures/auth-helpers';
+import { generateTestUser, registerUserViaApi } from '../fixtures/auth-helpers';
 
 test.describe('PHASE 6: Discovery, Search & Filter Testing', () => {
   let testUser = generateTestUser();
   let authToken: string;
 
   test.beforeAll(async ({ request }) => {
-    const res = await request.post('/api/v1/auth/register', {
-      data: testUser,
-    });
-    const json = await res.json();
+    const { body: json } = await registerUserViaApi(request, testUser);
     authToken = json?.data?.tokens?.accessToken || json?.tokens?.accessToken;
   });
 
