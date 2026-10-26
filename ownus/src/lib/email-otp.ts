@@ -117,7 +117,7 @@ const fail = (status: number, errorCode: string, message: string, details?: Reco
  */
 export async function sendEmailOtp(
   db: GatewayDb,
-  input: { email: unknown; purpose?: unknown; ip?: string; accountExists: (email: string) => Promise<boolean>; mailer: (email: string, code: string, minutes: number) => Promise<boolean> },
+  input: { email: unknown; purpose?: unknown; ip?: string; accountExists: (email: string) => Promise<boolean>; existingAccountMailer?: (email: string) => Promise<boolean>; mailer: (email: string, code: string, minutes: number) => Promise<boolean> },
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<OtpResult> {
   const email = normalizeEmail(input.email);
@@ -177,6 +177,14 @@ export async function sendEmailOtp(
     if (!delivered) {
       await db.query(`DELETE FROM email_otp_challenges WHERE id = $1`, [challengeId]).catch(() => undefined);
       return fail(503, 'EMAIL_DELIVERY_FAILED', 'We could not send the verification code right now. Please try again in a moment.');
+    }
+  }
+  if (!code) {
+    // The address already has an account: no code exists and the answer below stays identical, but its owner is told why nothing arrives.
+    try {
+      await input.existingAccountMailer?.(email);
+    } catch {
+      /* a failed notice changes nothing */
     }
   }
   return {

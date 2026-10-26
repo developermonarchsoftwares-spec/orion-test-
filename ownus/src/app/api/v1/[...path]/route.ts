@@ -11,7 +11,7 @@ import { isPublishStatus, PUBLISH_REFUSED_REASON, refusedLookupSql, statusUpdate
 import crypto from 'crypto';
 import { findAdminAccount, fixedOtpAllowed } from '@/lib/admin-account';
 import { burnPasswordCheck, hashPassword, needsRehash, verifyPassword } from '@/lib/password';
-import { sendAdminOtpEmail, isAuthorizedAdminEmail, sendPasswordResetEmail, sendSignupOtpEmail } from '@/lib/email-service';
+import { sendAdminOtpEmail, isAuthorizedAdminEmail, sendPasswordResetEmail, sendSignupOtpEmail, sendExistingAccountEmail } from '@/lib/email-service';
 import { REGISTER_WITH_PROOF_SQL, parseProof, poolAdapter, registrationOtpRequired, sendEmailOtp, verifyEmailOtp } from '@/lib/email-otp';
 import { dispatchUserNotification } from '@/lib/notification-dispatcher';
 import { queryDb, queryDbStrict, DbWriteError, getDbPool } from '@/lib/db';
@@ -1652,6 +1652,7 @@ async function handleSendOtp(req: NextRequest): Promise<NextResponse> {
     ip,
     accountExists: async (email) => ((await queryDb(`SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1`, [email])) || []).length > 0,
     mailer: sendSignupOtpEmail,
+    existingAccountMailer: (to) => sendExistingAccountEmail(to, process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim() || req.nextUrl.origin),
   });
   return NextResponse.json(result.body, { status: result.status });
 }
@@ -2636,6 +2637,18 @@ async function proxyRequest(
 
   // User logout: revoke the session natively (S-05) regardless of upstream reachability.
   if (fullPath === 'auth/logout' && req.method === 'POST') {
+    // With a remote API the session and refresh token live there: revoke them first, or a "logged out" refresh token keeps minting new
+    // tokens. This must run before the native logout, which rotates the account's active session id. Best effort: if the API is
+    // unreachable the native logout still ends the gateway-side session.
+    if (hasRemoteBackend()) {
+      try {
+        const targetUrl = new URL(`${getBackendUrl()}/${fullPath}${req.nextUrl.search}`);
+        const bodyBuffer = await req.clone().arrayBuffer().catch(() => undefined);
+        await fetch(targetUrl.toString(), { method: 'POST', headers: headersForApi(req.headers), body: bodyBuffer });
+      } catch {
+        // fall through to the native logout
+      }
+    }
     return await handleUserLogout(req);
   }
 

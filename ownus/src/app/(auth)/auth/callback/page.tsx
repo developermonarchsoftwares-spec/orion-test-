@@ -13,12 +13,19 @@ function CallbackHandler() {
   const [status, setStatus] = useState<"processing" | "success" | "error">("processing");
   const [message, setMessage] = useState("Authenticating with Orion...");
   const executedRef = useRef(false);
+  // Only a real unmount may stop the sign-in from finishing. A per-effect flag was cleared whenever the effect re-ran (router / search-params
+  // identity changes after the profile loads), so the redirect to /dashboard never happened and the user stayed on "Securing Identity".
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (executedRef.current) return;
     executedRef.current = true;
-
-    let isMounted = true;
 
     async function processAuth() {
       const error = searchParams.get("error");
@@ -29,7 +36,7 @@ function CallbackHandler() {
       const provider = searchParams.get("provider");
 
       if (error) {
-        if (!isMounted) return;
+        if (!mountedRef.current) return;
         setStatus("error");
         setMessage(decodeURIComponent(error));
         toast.error(decodeURIComponent(error));
@@ -38,7 +45,7 @@ function CallbackHandler() {
       }
 
       if (linked) {
-        if (!isMounted) return;
+        if (!mountedRef.current) return;
         setStatus("success");
         setMessage(`Successfully linked ${provider || "provider"} to your account!`);
         toast.success(`Successfully connected your ${provider || "social"} account.`);
@@ -48,11 +55,11 @@ function CallbackHandler() {
 
       if (accessToken && refreshToken) {
         try {
-          if (!isMounted) return;
+          if (!mountedRef.current) return;
           setMessage("Setting up your workspace & wallet...");
           await handleOAuthTokens(accessToken, refreshToken);
 
-          if (!isMounted) return;
+          if (!mountedRef.current) return;
           setStatus("success");
 
           if (isNewUser) {
@@ -63,7 +70,7 @@ function CallbackHandler() {
 
           router.replace("/dashboard");
         } catch (err: any) {
-          if (!isMounted) return;
+          if (!mountedRef.current) return;
           setStatus("error");
           const errorMsg = err.message || "Failed to initialize session. Please try logging in again.";
           setMessage(errorMsg);
@@ -74,17 +81,13 @@ function CallbackHandler() {
       }
 
       // No relevant params found
-      if (!isMounted) return;
+      if (!mountedRef.current) return;
       setStatus("error");
       setMessage("No authentication tokens found. Redirecting to login...");
       setTimeout(() => router.replace("/login"), 1500);
     }
 
     processAuth();
-
-    return () => {
-      isMounted = false;
-    };
   }, [searchParams, handleOAuthTokens, router]);
 
   return (

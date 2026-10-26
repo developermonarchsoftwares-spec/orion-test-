@@ -178,6 +178,28 @@ describe('gateway e-mail code: store against PostgreSQL', () => {
     assert.deepEqual(errs, ['OTP_INVALID', 'OTP_INVALID', 'OTP_INVALID', 'OTP_INVALID', 'OTP_ATTEMPTS_EXCEEDED']);
   });
 
+  it('an address that already has an account is told by e-mail why no code arrives, and the answer stays identical', async (t) => {
+    if (!pg) return t.skip(skipReason);
+    const accounts = new Set(['ada@example.com']);
+    const notices: string[] = [];
+    const existingAccountMailer = async (e: string) => {
+      notices.push(e);
+      return true;
+    };
+    const a = await send('ada@example.com', { existingAccountMailer }, accounts);
+    const b = await send('new@example.com', { existingAccountMailer }, accounts);
+    assert.equal(a.status, b.status);
+    assert.deepEqual(Object.keys(a.body).sort(), Object.keys(b.body).sort());
+    assert.deepEqual(notices, ['ada@example.com']); // the notice goes to the existing address only
+    assert.deepEqual(sent.map((s) => s.email), ['new@example.com']); // and only the new address receives a code
+    // a failing notice never changes what the visitor sees
+    const failing = async () => {
+      throw new Error('provider down');
+    };
+    const c = await send('ada2@example.com', { existingAccountMailer: failing }, new Set(['ada2@example.com']));
+    assert.equal(c.status, 200);
+  });
+
   it('verifies the right code once; wrong, expired, reused and locked codes fail', async (t) => {
     if (!pg) return t.skip(skipReason);
     await send('ada@example.com');

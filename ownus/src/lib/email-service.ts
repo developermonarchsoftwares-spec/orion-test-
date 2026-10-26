@@ -478,3 +478,37 @@ export async function sendSignupOtpEmail(email: string, otp: string, minutes: nu
     return false;
   }
 }
+
+/** The notice sent instead of a code when sign-up is started for an address that already has an account (it holds no secret, only sign-in links). */
+export function getExistingAccountContent(baseUrl: string): { subject: string; text: string; html: string } {
+  const brand = sanitizeHeader(process.env.APP_NAME || "Orion").replace(/[<>]/g, "").slice(0, 60) || "Orion";
+  const base = baseUrl.replace(/\/+$/, "");
+  const text = [
+    `Someone, hopefully you, started creating a ${brand} account with this email address, but an account with this address already exists, so no verification code was sent.`,
+    "",
+    `Sign in: ${base}/login`,
+    `Forgot your password? ${base}/forgot-password`,
+    "",
+    "If this was not you, you can ignore this message; nothing was changed.",
+  ].join("\n");
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${brand}</title></head><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#18181b;line-height:1.6;padding:24px;"><p style="font-size:18px;font-weight:700;margin:0 0 12px;">${brand}</p><p>Someone, hopefully you, started creating a ${brand} account with this email address, but <strong>an account with this address already exists</strong>, so no verification code was sent.</p><p><a href="${base}/login">Sign in</a> &middot; <a href="${base}/forgot-password">Forgot your password?</a></p><p style="color:#71717a;font-size:13px;">If this was not you, you can ignore this message; nothing was changed.</p></body></html>`;
+  return { subject: `${brand}: you already have an account`, text, html };
+}
+
+/** Sends that notice through Resend. Resolves true only when the provider accepted it. Never logs the address. */
+export async function sendExistingAccountEmail(email: string, baseUrl: string): Promise<boolean> {
+  const key = getResendApiKey();
+  if (!key) return false;
+  const { subject, text, html } = getExistingAccountContent(baseUrl);
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: getResendSenderAddress(), to: [email], subject, html, text }),
+    });
+    const json = await res.json().catch(() => ({}));
+    return Boolean(res.ok && json.id);
+  } catch {
+    return false;
+  }
+}
