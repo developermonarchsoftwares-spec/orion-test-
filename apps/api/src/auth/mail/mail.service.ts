@@ -16,12 +16,21 @@ export interface IMailTransport {
   send(mail: IMail): Promise<void>;
 }
 
+/** The From header for the `resend` transport; mirrors getResendSenderAddress in the web gateway (ownus/src/lib/email-service.ts). */
+export function resendSender(env: NodeJS.ProcessEnv = process.env): string {
+  const from = env.RESEND_FROM_EMAIL?.trim();
+  if (!from) return 'Monarch Security <security@monarchsoftwares.com>';
+  return from.includes('<') && from.includes('>') ? from : `Monarch Security <${from}>`;
+}
+
 /**
  * Outbound e-mail for account flows (password reset, verification, security notices).
  *
  * Transport is chosen by MAIL_TRANSPORT:
  *  - `webhook`: POST {to, subject, text} as JSON to MAIL_WEBHOOK_URL (optional bearer MAIL_WEBHOOK_TOKEN), so any
  *    provider (SES/Resend/SendGrid behind a small relay) can be plugged in without a new dependency.
+ *  - `resend`: sent directly through the Resend API with RESEND_API_KEY; the sender is RESEND_FROM_EMAIL (a bare address gets the
+ *    "Monarch Security" display name, the same rule the web gateway uses for its own mail).
  *  - `log` (default outside production): the message is written to the application log. Never use in production:
  *    the log would then hold live reset links. In production without a configured transport, sending fails closed
  *    (is logged as an error, the link is NOT logged) so the gap is visible instead of silently leaking tokens.
@@ -62,6 +71,18 @@ export class MailService {
           body: JSON.stringify(mail),
         });
         if (!res.ok) throw new Error(`mail webhook responded ${res.status}`);
+        return true;
+      }
+      if (mode === 'resend') {
+        const key = process.env.RESEND_API_KEY?.trim();
+        if (!key) throw new Error('RESEND_API_KEY is not set');
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+          body: JSON.stringify({ from: resendSender(), to: [mail.to], subject: mail.subject, text: mail.text, ...(mail.html ? { html: mail.html } : {}) }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!res.ok) throw new Error(`resend responded ${res.status}`); // the response body is not logged: it can echo the recipient
         return true;
       }
       if (mode === 'log') {
