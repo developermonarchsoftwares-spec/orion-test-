@@ -13,12 +13,14 @@ if (!['api', 'web'].includes(which)) {
   console.error('usage: start-e2e-server.cjs <api|web>');
   process.exit(2);
 }
-if (!process.env.DATABASE_URL) {
+// apps/api/.env may point DATABASE_URL at production Neon; the local server's credentials then live in LOCAL_DATABASE_URL
+const serverUrl = process.env.LOCAL_DATABASE_URL || process.env.DATABASE_URL;
+if (!serverUrl) {
   console.error('DATABASE_URL is not set in apps/api/.env; it supplies the local server credentials.');
   process.exit(2);
 }
 
-const url = new URL(process.env.DATABASE_URL);
+const url = new URL(serverUrl);
 if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname)) {
   console.error('The browser tests only run against a local database server.');
   process.exit(2);

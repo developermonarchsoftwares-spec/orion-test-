@@ -15,7 +15,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '..', 'apps', 'api', '.env')
 export const E2E_DATABASE = 'orion_e2e';
 
 function e2eConnectionString(): string {
-  const raw = process.env.DATABASE_URL;
+  const raw = process.env.LOCAL_DATABASE_URL || process.env.DATABASE_URL; // apps/api/.env may point DATABASE_URL at production Neon
   if (!raw) throw new Error('DATABASE_URL is not set in apps/api/.env (it supplies the local server credentials).');
   const url = new URL(raw);
   if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname)) throw new Error('The browser tests only touch a local database server.');

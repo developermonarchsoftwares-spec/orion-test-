@@ -27,6 +27,23 @@ export const KNOWN_ADMIN = {
 };
 
 /** The local mail sink (tests/fixtures/mail-capture-server.mjs). The API is started with MAIL_TRANSPORT=webhook pointing at it. */
+/**
+ * Per-route request pacing. The API limits each address to 6 sign-up codes, 10 registrations and 10 logins per minute (the limits are product
+ * security rules and are left alone). A suite that signs many users up would otherwise trip them and fail for reasons unrelated to what it
+ * tests, so the helpers wait until a request fits under the limit with one to spare. State is per worker process (the suite uses one worker).
+ */
+const RATE_LIMITS: Record<string, number> = { 'send-otp': 5, register: 8, login: 8 }; // per 60 s, each one below the API limit
+const requestTimes: Record<string, number[]> = {};
+export async function pace(route: keyof typeof RATE_LIMITS | string): Promise<void> {
+  const limit = RATE_LIMITS[route] ?? 5;
+  const times = (requestTimes[route] = (requestTimes[route] ?? []).filter((t) => Date.now() - t < 60_000));
+  if (times.length >= limit) {
+    await new Promise((r) => setTimeout(r, 60_000 - (Date.now() - times[0]) + 1000));
+    return pace(route);
+  }
+  times.push(Date.now());
+}
+
 export const MAIL_CAPTURE_URL = `http://127.0.0.1:${process.env.MAIL_CAPTURE_PORT || 4455}`;
 
 /**
@@ -56,6 +73,7 @@ export async function getEmailOtp(request: APIRequestContext, email: string, not
  */
 export async function verifyEmailViaApi(request: APIRequestContext, email: string): Promise<string> {
   await clearOldOtpChallenges();
+  await pace('send-otp');
   const startedAt = Date.now();
   const send = await request.post('/api/v1/auth/send-otp', { data: { email, purpose: 'REGISTER' } });
   expect(send.status(), `send-otp failed: ${await send.text()}`).toBeLessThan(300);
@@ -74,6 +92,7 @@ export async function registerUserViaApi(
   user: TestUserCredentials
 ): Promise<{ status: number; body: any }> {
   const verificationToken = await verifyEmailViaApi(request, user.email);
+  await pace('register');
   const res = await request.post('/api/v1/auth/register', {
     data: { email: user.email, password: user.password, firstName: user.firstName, lastName: user.lastName, verificationToken },
   });
@@ -99,6 +118,8 @@ export async function registerUserViaUI(
   const termsCheckbox = page.locator('#terms');
   await termsCheckbox.check();
 
+  await pace('send-otp');
+  await pace('register');
   const startedAt = Date.now();
   const continueBtn = page.getByRole('button', { name: /^continue$/i });
   await expect(continueBtn).toBeEnabled({ timeout: 5000 });
@@ -118,11 +139,17 @@ export async function registerUserViaUI(
 /**
  * Perform a UI-based user login
  */
+export async function loginViaApi(request: APIRequestContext, email: string, password: string) {
+  await pace('login');
+  return request.post('/api/v1/auth/login', { data: { email, password } });
+}
+
 export async function loginUserViaUI(
   page: Page,
   email: string,
   password: string
 ): Promise<void> {
+  await pace('login');
   await page.goto('/login');
   await page.waitForLoadState('domcontentloaded');
 
