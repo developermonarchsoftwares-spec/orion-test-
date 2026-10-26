@@ -409,10 +409,11 @@ describe('Sign-up e-mail verification code', () => {
       const email = newEmail();
       expect((await register(email, await proofFor(email))).status).toBe(201);
       await backdate(120);
-      // an address that has an account can request a code (generic answer) but receives none
+      // an address that has an account can request a code (generic answer) but receives no code: only a notice that the account exists
       outbox = [];
       expect((await send(email)).status).toBe(200);
-      expect(outbox).toHaveLength(0);
+      expect(outbox).toHaveLength(1);
+      expect(outbox[0].text).not.toMatch(/\b\d{6}\b/);
       const dup = await register(email, 'any.' + 'A'.repeat(43));
       expect([403, 409]).toContain(dup.status);
       expect(await usersOf(email)).toHaveLength(1);
@@ -495,7 +496,17 @@ describe('Sign-up e-mail verification code', () => {
       expect(a.status).toBe(b.status);
       expect(Object.keys(unwrap(a)).sort()).toEqual(Object.keys(unwrap(b)).sort());
       expect(unwrap(a).message).toBe(unwrap(b).message);
-      expect(outbox.map((m) => m.to)).toEqual([fresh]);
+      // the screen cannot tell the two apart, but the owner of the existing address is told by e-mail why no code comes: a notice with the
+      // sign-in links and NO code, while only the new address receives a code
+      expect(outbox.map((m) => m.to).sort()).toEqual([existing, fresh].sort());
+      const notice = outbox.find((m) => m.to === existing) as IMail;
+      const codeMail = outbox.find((m) => m.to === fresh) as IMail;
+      expect(notice.sensitive).toBeFalsy();
+      expect(notice.text).toMatch(/already exists/i);
+      expect(notice.text).toMatch(/\/login/);
+      expect(notice.text).not.toMatch(/\b\d{6}\b/);
+      expect(notice.html).not.toMatch(/\b\d{6}\b/);
+      expect(codeMail.text).toMatch(/\b\d{6}\b/);
       // a code guessed for the existing address fails like any other and locks after 5
       const codes = ['000001', '000002', '000003', '000004', '000005'];
       const errs: string[] = [];

@@ -34,3 +34,23 @@ export function buildEmailOtpMail(to: string, code: string, minutes: number, env
 </table></td></tr></table></body></html>`;
   return { to, subject: `${brand}: your verification code`, text, html, sensitive: true };
 }
+
+/**
+ * Sent INSTEAD of a code when someone starts sign-up with an address that already has an account. The sign-up screen answers exactly as for a
+ * new address (so it cannot be used to find out who is registered), which left the real owner waiting for a code that never comes; this tells
+ * them why and where to go. It holds no secret: only links to the sign-in and password-reset pages of the web app.
+ */
+export function buildExistingAccountMail(to: string, webUrl: string, env: NodeJS.ProcessEnv = process.env): IMail {
+  const brand = otpBrandName(env);
+  const base = webUrl.replace(/\/+$/, '');
+  const text = [
+    `Someone, hopefully you, started creating a ${brand} account with this email address, but an account with this address already exists, so no verification code was sent.`,
+    "",
+    `Sign in: ${base}/login`,
+    `Forgot your password? ${base}/forgot-password`,
+    "",
+    "If this was not you, you can ignore this message; nothing was changed.",
+  ].join('\n');
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${brand}</title></head><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#18181b;line-height:1.6;padding:24px;"><p style="font-size:18px;font-weight:700;margin:0 0 12px;">${brand}</p><p>Someone, hopefully you, started creating a ${brand} account with this email address, but <strong>an account with this address already exists</strong>, so no verification code was sent.</p><p><a href="${base}/login">Sign in</a> &middot; <a href="${base}/forgot-password">Forgot your password?</a></p><p style="color:#71717a;font-size:13px;">If this was not you, you can ignore this message; nothing was changed.</p></body></html>`;
+  return { to, subject: `${brand}: you already have an account`, text, html };
+}

@@ -16,6 +16,8 @@ export class OAuthStateService {
   private readonly logger = new Logger(OAuthStateService.name);
   private readonly secret: string;
   private readonly stateStore = new Map<string, IOAuthStatePayload>();
+  /** Nonces of states this process has accepted once (see verifyState). */
+  private readonly usedNonces = new Set<string>();
 
   constructor(private readonly configService: ConfigService) {
     // the access secret from the environment; never a built-in value (a random per-process key outside production)
@@ -100,12 +102,18 @@ export class OAuthStateService {
         return { valid: false };
       }
 
-      // Enforce strict replay protection: state must exist in store and is consumed once
-      if (!this.stateStore.has(state)) {
-        this.logger.warn('OAuth state token has already been consumed or is invalid (replay prevented)');
+      // One-time use. The signature and expiry above already prove the state was issued by us, so it does not matter WHICH process issued it:
+      // on a serverless host (Vercel) the start of sign-in and the return from Google routinely run on different instances, and any cold
+      // start empties this process's memory, so requiring the state to be in this process's store rejected genuine sign-ins. Each process
+      // therefore remembers the nonces it has seen used and refuses a second use; a replay that lands on another instance still needs a
+      // Google authorization code, which Google itself accepts only once.
+      if (this.usedNonces.has(payload.nonce)) {
+        this.logger.warn('OAuth state token has already been consumed (replay prevented)');
         return { valid: false };
       }
-      this.stateStore.delete(state); // One-time use to prevent replay attacks
+      this.usedNonces.add(payload.nonce);
+      setTimeout(() => this.usedNonces.delete(payload.nonce), 15 * 60 * 1000).unref?.();
+      this.stateStore.delete(state);
 
       return { valid: true, payload };
     } catch (err: any) {

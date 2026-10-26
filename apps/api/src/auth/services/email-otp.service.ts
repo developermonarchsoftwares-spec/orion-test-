@@ -26,7 +26,7 @@ import {
   parseProof,
   safeEqualHex,
 } from '../email-otp.util';
-import { buildEmailOtpMail } from '../mail/email-otp.mail';
+import { buildEmailOtpMail, buildExistingAccountMail } from '../mail/email-otp.mail';
 import * as crypto from 'crypto';
 
 export const GENERIC_OTP_SENT_MESSAGE = 'If this email can be used for verification, a 6-digit code has been sent.';
@@ -139,6 +139,11 @@ export class EmailOtpService {
         await this.auditOtp('EMAIL_OTP_SEND_FAILED', 'FAILURE', email, ctx, { purpose });
         throw new BusinessException('We could not send the verification code right now. Please try again in a moment.', 'EMAIL_DELIVERY_FAILED', HttpStatus.SERVICE_UNAVAILABLE);
       }
+    }
+    if (!code) {
+      // The address already has an account, so no code exists. The screen's answer stays identical, but the owner is told by e-mail why no code
+      // arrives and where to sign in. Awaited like the code mail so the response takes the same time; a failure here changes nothing.
+      await this.mail.sendChecked(buildExistingAccountMail(email, this.mail.webUrl()));
     }
     await this.auditOtp('EMAIL_OTP_REQUESTED', 'SUCCESS', email, ctx, { purpose, delivered: Boolean(code), accountExists });
 

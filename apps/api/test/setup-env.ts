@@ -25,5 +25,8 @@ process.env.RAZORPAY_WEBHOOK_SECRET = TEST_SECRETS.razorpayWebhookSecret;
 // S-09 is enabled in production (THROTTLE_TTL is milliseconds in @nestjs/throttler v6). The E2E suites
 // drive hundreds of sequential requests through one process, which legitimately exceeds a real per-minute
 // limit, so the test environment raises the ceiling. Production uses its own THROTTLE_* values.
+// The cron routes (GET /cron/:job) answer 503 "not configured" without a secret of 32+ characters. With one set they answer 401 to anything
+// without it, which is what the API-contract sweep (every route, hostile requests, no server error) expects of an unauthenticated caller.
+process.env.CRON_SECRET = 'e2e-only-cron-secret-0123456789abcdef-not-used-anywhere-else';
 process.env.THROTTLE_TTL = process.env.THROTTLE_TTL || '60000';
 process.env.THROTTLE_LIMIT = process.env.THROTTLE_LIMIT || '1000000';
