@@ -63,7 +63,7 @@ export class OAuthStateService {
     this.stateStore.set(state, payload);
 
     // Clean up older states after 15 minutes
-    setTimeout(() => this.stateStore.delete(state), 15 * 60 * 1000);
+    setTimeout(() => this.stateStore.delete(state), 15 * 60 * 1000).unref?.();
 
     return { state, codeVerifier, codeChallenge };
   }
