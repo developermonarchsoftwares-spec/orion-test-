@@ -52,6 +52,13 @@ export class UnlockController {
     return this.unlockService.getUnlockHistory(user.sub, p.page, p.limit);
   }
 
+  @Get('user-leads')
+  @ApiOperation({ summary: 'Ids of all businesses the current user has unlocked' })
+  @ApiResponse({ status: 200, description: '{ unlockedIds: string[] }' })
+  async getUserLeads(@CurrentUser() user: IJwtPayload) {
+    return this.unlockService.getUnlockedBusinessIds(user.sub);
+  }
+
   @Get('status/:businessId')
   @ApiOperation({ summary: 'Check if a business has been unlocked by current user' })
   @ApiResponse({ status: 200, description: 'Unlock status' })

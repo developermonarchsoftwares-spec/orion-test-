@@ -275,6 +275,15 @@ export class UnlockService {
   /**
    * Check if user has already unlocked a specific business
    */
+  /** Ids of every business this user has unlocked: what the web app needs to mark cards as unlocked without paging through the history. */
+  async getUnlockedBusinessIds(userId: string): Promise<{ unlockedIds: string[] }> {
+    const rows = await this.db
+      .select({ businessId: schema.leadUnlocks.businessId })
+      .from(schema.leadUnlocks)
+      .where(eq(schema.leadUnlocks.userId, userId));
+    return { unlockedIds: rows.map((r) => String(r.businessId)) };
+  }
+
   async checkStatus(userId: string, businessId: string) {
     const existing = await this.unlockRepo.findUnlock(userId, businessId);
     return {

@@ -179,6 +179,19 @@ describe('Sprint 16: Lead Discovery, Contact Masking & Unlock E2E Tests', () => 
       expect(items.length).toBeGreaterThanOrEqual(1);
       expect(items[0].businessId).toBe(testBizId);
     });
+
+    it('GET /api/v1/unlock/user-leads -> should list the ids of unlocked leads, and require a session', async () => {
+      const anonymous = await request(app.getHttpServer()).get('/api/v1/unlock/user-leads');
+      expect(anonymous.status).toBe(401);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/unlock/user-leads')
+        .set('Authorization', `Bearer ${unlockUserToken}`);
+
+      expect(res.status).toBe(200);
+      const data = res.body.data || res.body;
+      expect(data.unlockedIds).toContain(testBizId);
+    });
   });
 
   describe('3. Insufficient Credits Enforcement', () => {
