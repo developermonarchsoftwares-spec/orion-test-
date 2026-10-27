@@ -20,6 +20,8 @@ export class LogoutDto {
 export class SendOtpDto {
   @ApiProperty({ example: 'director@company.in' }) @IsString() @MaxLength(254) email!: string;
   @ApiPropertyOptional({ example: 'REGISTER' }) @IsOptional() @IsString() @MaxLength(32) purpose?: string;
+  @ApiPropertyOptional({ description: 'Turnstile CAPTCHA token from the browser; required when the server has a CAPTCHA secret configured' })
+  @IsOptional() @IsString() @MaxLength(4096) captchaToken?: string;
 }
 
 export class VerifyOtpDto {
@@ -99,6 +101,12 @@ export class LoginDto {
   @IsString()
   @MaxLength(200)
   website?: string;
+
+  @ApiPropertyOptional({ description: 'Turnstile CAPTCHA token from the browser; required when the server has a CAPTCHA secret configured' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4096)
+  captchaToken?: string;
 }
 
 export class RefreshTokenDto {

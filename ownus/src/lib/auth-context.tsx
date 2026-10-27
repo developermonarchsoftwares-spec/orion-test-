@@ -40,7 +40,7 @@ interface AuthContextType {
   wallet: Wallet | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, captchaToken?: string | null) => Promise<void>;
   register: (data: any) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -187,10 +187,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshProfile]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, captchaToken?: string | null) => {
     setIsLoading(true);
     try {
-      const res: any = await apiClient.auth.login({ email, password });
+      const res: any = await apiClient.auth.login({ email, password, ...(captchaToken ? { captchaToken } : {}) });
       const accessToken = res?.accessToken || res?.tokens?.accessToken || res?.data?.accessToken || res?.data?.tokens?.accessToken;
       const refreshToken = res?.refreshToken || res?.tokens?.refreshToken || res?.data?.refreshToken || res?.data?.tokens?.refreshToken;
       

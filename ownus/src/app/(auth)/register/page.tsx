@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
 import { OtpInput } from "@/components/auth/otp-input";
+import { Turnstile, captchaEnabled, type TurnstileHandle } from "@/components/auth/turnstile";
 import { OTP_LENGTH, describeOtpError, isCompleteOtp, maskEmailForDisplay, resendLabel } from "@/lib/otp-flow";
 
 function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
@@ -54,6 +55,11 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  // Step 1 shows a visible challenge; the resend link on step 2 uses an invisible one that only appears if Cloudflare wants more. A token works once.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [resendCaptchaToken, setResendCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileHandle>(null);
+  const resendCaptchaRef = useRef<TurnstileHandle>(null);
   const [existingAccountError, setExistingAccountError] = useState<string | null>(null);
 
   // E-mail verification: step 1 collects the details and sends a code; step 2 checks the code, then creates the account. The browser
@@ -123,11 +129,15 @@ export default function RegisterPage() {
       toast.error("Password must be at least 8 characters long.");
       return;
     }
+    if (captchaEnabled && !captchaToken) {
+      toast.error("Please complete the security check before continuing.");
+      return;
+    }
     busy.current = true;
     setIsLoading(true);
     setExistingAccountError(null);
     try {
-      const res: any = await apiClient.auth.sendOtp(email.trim());
+      const res: any = await apiClient.auth.sendOtp(email.trim(), captchaToken);
       startVerify(res);
     } catch (err: any) {
       const f = describeOtpError(err);
@@ -141,6 +151,7 @@ export default function RegisterPage() {
     } finally {
       busy.current = false;
       setIsLoading(false);
+      captchaRef.current?.reset();
     }
   };
 
@@ -220,11 +231,15 @@ export default function RegisterPage() {
 
   const handleResend = async () => {
     if (busy.current || cooldown > 0) return;
+    if (captchaEnabled && !resendCaptchaToken) {
+      setOtpError("Please complete the security check, then try again.");
+      return;
+    }
     busy.current = true;
     setIsResending(true);
     setOtpError(null);
     try {
-      const res: any = await apiClient.auth.sendOtp(email.trim());
+      const res: any = await apiClient.auth.sendOtp(email.trim(), resendCaptchaToken);
       setOtp("");
       setProof(null);
       setCooldown(Number(res?.resendAfterSeconds) || 60);
@@ -237,6 +252,7 @@ export default function RegisterPage() {
     } finally {
       busy.current = false;
       setIsResending(false);
+      resendCaptchaRef.current?.reset();
     }
   };
 
@@ -442,9 +458,16 @@ export default function RegisterPage() {
             </label>
           </div>
 
+          <Turnstile
+            ref={captchaRef}
+            onToken={setCaptchaToken}
+            onUnavailable={() => toast.error("The security check could not load. Disable any content blockers for this site, check your connection and reload the page.")}
+            className="flex justify-center"
+          />
+
           <button
             type="submit"
-            disabled={!agreeTerms || isLoading}
+            disabled={!agreeTerms || isLoading || (captchaEnabled && !captchaToken)}
             className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-md bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 px-4 py-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:opacity-50 transition-colors cursor-pointer"
           >
             {isLoading ? (
@@ -523,6 +546,7 @@ export default function RegisterPage() {
           </form>
 
           <div className="flex flex-col items-center gap-2 text-sm">
+            <Turnstile ref={resendCaptchaRef} onToken={setResendCaptchaToken} appearance="interaction-only" className="flex justify-center" />
             <button
               type="button"
               onClick={() => void handleResend()}

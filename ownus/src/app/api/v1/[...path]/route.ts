@@ -12,6 +12,7 @@ import crypto from 'crypto';
 import { findAdminAccount, fixedOtpAllowed } from '@/lib/admin-account';
 import { burnPasswordCheck, hashPassword, needsRehash, verifyPassword } from '@/lib/password';
 import { sendAdminOtpEmail, isAuthorizedAdminEmail, sendPasswordResetEmail, sendSignupOtpEmail, sendExistingAccountEmail } from '@/lib/email-service';
+import { checkCaptcha } from '@/lib/captcha';
 import { REGISTER_WITH_PROOF_SQL, parseProof, poolAdapter, registrationOtpRequired, sendEmailOtp, verifyEmailOtp } from '@/lib/email-otp';
 import { dispatchUserNotification } from '@/lib/notification-dispatcher';
 import { queryDb, queryDbStrict, DbWriteError, getDbPool } from '@/lib/db';
@@ -145,7 +146,7 @@ function handleGoogleAuth(req: NextRequest): NextResponse {
     );
   }
 
-  const host = req.headers.get('x-forwarded-host') || req.nextUrl.host || 'orion-api-snowy.vercel.app';
+  const host = req.headers.get('x-forwarded-host') || req.nextUrl.host || 'localhost:3000';
   const isLocal = isLocalRequestHost(host);
   let callbackUrl = sanitizeEnvValue(process.env.GOOGLE_CALLBACK_URL, 'GOOGLE_CALLBACK_URL');
   if (!callbackUrl || !callbackUrl.startsWith('http')) {
@@ -223,7 +224,7 @@ async function handleGoogleCallback(req: NextRequest): Promise<NextResponse> {
   const clientId = sanitizeEnvValue(process.env.GOOGLE_CLIENT_ID, 'GOOGLE_CLIENT_ID');
   const clientSecret = sanitizeEnvValue(process.env.GOOGLE_CLIENT_SECRET, 'GOOGLE_CLIENT_SECRET');
 
-  const host = req.headers.get('x-forwarded-host') || req.nextUrl.host || 'orion-api-snowy.vercel.app';
+  const host = req.headers.get('x-forwarded-host') || req.nextUrl.host || 'localhost:3000';
   const isLocal = isLocalRequestHost(host);
   let callbackUrl = sanitizeEnvValue(process.env.GOOGLE_CALLBACK_URL, 'GOOGLE_CALLBACK_URL');
   if (!callbackUrl || !callbackUrl.startsWith('http')) {
@@ -1489,6 +1490,11 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
     return tooManyRequests('Too many login attempts. Please wait a few minutes and try again.');
   }
 
+  const captchaRejection = await checkCaptcha(body?.captchaToken, clientIpOf(req));
+  if (captchaRejection) {
+    return NextResponse.json({ success: false, statusCode: captchaRejection.status, errorCode: captchaRejection.errorCode, message: captchaRejection.message }, { status: captchaRejection.status });
+  }
+
   let dbUser: any = null;
   try {
     const rows = await queryDb(
@@ -1650,6 +1656,10 @@ async function handleSendOtp(req: NextRequest): Promise<NextResponse> {
   if (body === null) return NextResponse.json({ success: false, statusCode: 400, message: 'Invalid JSON body' }, { status: 400 });
   const ip = clientIpOf(req);
   if (gatewayRateLimited(`otp-send:ip:${ip}`, 12, 10 * 60000)) return tooManyRequests('Too many verification requests. Please wait a few minutes and try again.');
+  const captchaRejection = await checkCaptcha(body?.captchaToken, ip);
+  if (captchaRejection) {
+    return NextResponse.json({ success: false, statusCode: captchaRejection.status, errorCode: captchaRejection.errorCode, message: captchaRejection.message }, { status: captchaRejection.status });
+  }
   const pool = getDbPool();
   if (!pool) return NextResponse.json({ success: false, statusCode: 503, errorCode: 'SERVICE_UNAVAILABLE', message: 'Verification is temporarily unavailable.' }, { status: 503 });
   const result = await sendEmailOtp(poolAdapter(pool as any), {

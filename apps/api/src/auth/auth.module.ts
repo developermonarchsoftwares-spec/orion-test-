@@ -6,6 +6,7 @@ import { PasswordService } from './services/password.service';
 import { AuthTokenService } from './services/auth-token.service';
 import { AuthService } from './services/auth.service';
 import { EmailOtpService } from './services/email-otp.service';
+import { CaptchaService } from './captcha/captcha.service';
 import { AuthController } from './auth.controller';
 import { AdminAuthController } from './admin-auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -45,6 +46,7 @@ import { UserModule } from '../modules/user/user.module';
     MailService,
     TokenCleanupService,
     EmailOtpService,
+    CaptchaService,
     AuthService,
     JwtStrategy,
     JwtRefreshStrategy,
@@ -55,6 +57,7 @@ import { UserModule } from '../modules/user/user.module';
   ],
   exports: [
     EmailOtpService,
+    CaptchaService,
     MailService,
     PasswordService,
     AuthTokenService,

@@ -14,6 +14,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { Request } from 'express';
 import { AuthService } from './services/auth.service';
 import { EmailOtpService } from './services/email-otp.service';
+import { CaptchaService } from './captcha/captcha.service';
 import { UserService } from '../modules/user/user.service';
 import {
   RegisterDto,
@@ -44,6 +45,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly userService: UserService,
     private readonly emailOtp: EmailOtpService,
+    private readonly captcha: CaptchaService,
   ) {}
 
   @Get('me')
@@ -75,6 +77,7 @@ export class AuthController {
   @ApiResponse({ status: 429, description: 'Resend cooldown, daily or network limit' })
   @ApiResponse({ status: 503, description: 'The e-mail could not be handed to the mail provider' })
   async sendOtp(@Body() dto: SendOtpDto, @Req() req: Request) {
+    await this.captcha.assertHuman(dto.captchaToken, clientIpOf(req));
     return this.emailOtp.send(dto.email, dto.purpose, { userAgent: req.headers['user-agent'], ipAddress: clientIpOf(req) });
   }
 
@@ -111,6 +114,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'JWT Token Pair and User Profile' })
   @ApiResponse({ status: 401, description: 'Invalid email or password' })
   async login(@Body() dto: LoginDto, @Req() req: Request) {
+    await this.captcha.assertHuman(dto.captchaToken, clientIpOf(req));
     const userAgent = req.headers['user-agent'];
     const ipAddress = clientIpOf(req);
     return this.authService.login(dto, { userAgent, ipAddress });

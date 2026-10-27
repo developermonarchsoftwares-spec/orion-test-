@@ -224,7 +224,7 @@ export class ApiClient {
   auth = {
     getMe: () => this.request('/auth/me'),
     /** Sign-up e-mail verification: ask for a code (also used to resend), then exchange it for a one-time proof that `register` must carry. */
-    sendOtp: (email: string) => this.request('/auth/send-otp', { method: 'POST', body: JSON.stringify({ email, purpose: 'REGISTER' }) }),
+    sendOtp: (email: string, captchaToken?: string | null) => this.request('/auth/send-otp', { method: 'POST', body: JSON.stringify({ email, purpose: 'REGISTER', ...(captchaToken ? { captchaToken } : {}) }) }),
     verifyOtp: (email: string, otp: string) => this.request('/auth/verify-otp', { method: 'POST', body: JSON.stringify({ email, otp, purpose: 'REGISTER' }) }),
     register: (dto: any) => this.request('/auth/register', { method: 'POST', body: JSON.stringify(dto) }),
     login: (dto: any) => this.request('/auth/login', { method: 'POST', body: JSON.stringify(dto) }),

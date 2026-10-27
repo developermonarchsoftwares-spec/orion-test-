@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
+import { Turnstile, captchaEnabled, type TurnstileHandle } from "@/components/auth/turnstile";
 
 function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -51,6 +52,8 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileHandle>(null);
 
   const errorParam = searchParams.get("error");
   const emailParam = searchParams.get("email");
@@ -83,13 +86,19 @@ function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (captchaEnabled && !captchaToken) {
+      toast.error("Please complete the security check before signing in.");
+      return;
+    }
     setIsLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, captchaToken);
       toast.success("Welcome back to Orion!");
       router.push("/dashboard");
     } catch (err: any) {
       toast.error(err.message || "Failed to sign in. Please check your credentials.");
+      // a CAPTCHA token works once: whatever went wrong, the next attempt needs a fresh challenge
+      captchaRef.current?.reset();
     } finally {
       setIsLoading(false);
     }
@@ -227,9 +236,16 @@ function LoginForm() {
             </label>
           </div>
 
+          <Turnstile
+            ref={captchaRef}
+            onToken={setCaptchaToken}
+            onUnavailable={() => toast.error("The security check could not load. Disable any content blockers for this site, check your connection and reload the page.")}
+            className="flex justify-center"
+          />
+
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || (captchaEnabled && !captchaToken)}
             className="mt-1 inline-flex h-10 w-full items-center justify-center rounded-md bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 px-4 py-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:opacity-50 transition-colors cursor-pointer"
           >
             {isLoading ? (

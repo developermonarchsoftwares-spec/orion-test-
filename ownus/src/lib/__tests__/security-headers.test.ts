@@ -16,8 +16,8 @@ describe('Phase 14: web security headers', () => {
 
   it('Razorpay checkout is allowed by exact origin in script, frame and connect, and nothing else was opened up', () => {
     const csp = buildCsp({ isProd: true });
-    assert.equal(directive(csp, 'script-src'), "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com");
-    assert.equal(directive(csp, 'frame-src'), "frame-src 'self' https://accounts.google.com https://login.microsoftonline.com https://api.razorpay.com https://checkout.razorpay.com");
+    assert.equal(directive(csp, 'script-src'), "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://challenges.cloudflare.com");
+    assert.equal(directive(csp, 'frame-src'), "frame-src 'self' https://accounts.google.com https://login.microsoftonline.com https://api.razorpay.com https://checkout.razorpay.com https://challenges.cloudflare.com");
     assert.doesNotMatch(csp, /\*\.razorpay/); // exact hosts, never a wildcard
     assert.doesNotMatch(directive(csp, 'script-src') + directive(csp, 'frame-src') + directive(csp, 'connect-src'), /(^|\s)https:(\s|$)/);
     assert.equal(directive(csp, 'default-src'), "default-src 'self'");
@@ -39,7 +39,7 @@ describe('Phase 14: web security headers', () => {
 
   it('the report-only policy has no inline script or style and blocks nothing by itself', () => {
     const ro = buildReportOnlyCsp({ isProd: true });
-    assert.equal(directive(ro, 'script-src'), "script-src 'self' https://checkout.razorpay.com");
+    assert.equal(directive(ro, 'script-src'), "script-src 'self' https://checkout.razorpay.com https://challenges.cloudflare.com");
     assert.doesNotMatch(directive(ro, 'style-src'), /unsafe-inline/);
     const prod = baseSecurityHeaders({ isProd: true });
     assert.ok(header(prod, 'Content-Security-Policy-Report-Only'));

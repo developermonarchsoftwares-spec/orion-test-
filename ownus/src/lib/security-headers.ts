@@ -28,6 +28,12 @@ export const RAZORPAY_ORIGINS = {
   connect: ['https://api.razorpay.com', 'https://lumberjack.razorpay.com'],
 } as const;
 
+/** Cloudflare Turnstile (the sign-in / sign-up CAPTCHA): its script, and the challenge frame served from the same origin. */
+export const TURNSTILE_ORIGINS = {
+  script: ['https://challenges.cloudflare.com'],
+  frame: ['https://challenges.cloudflare.com'],
+} as const;
+
 const common = (env: IHeaderEnv) => {
   const api = originOf(env.apiUrl);
   return {
@@ -51,9 +57,9 @@ export function buildCsp(env: IHeaderEnv): string {
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https://fonts.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    ["script-src 'self' 'unsafe-inline'", ...RAZORPAY_ORIGINS.script].join(' ') + (env.isProd ? '' : " 'unsafe-eval'"),
+    ["script-src 'self' 'unsafe-inline'", ...RAZORPAY_ORIGINS.script, ...TURNSTILE_ORIGINS.script].join(' ') + (env.isProd ? '' : " 'unsafe-eval'"),
     `connect-src ${common(env).connect.join(' ')}`,
-    ["frame-src 'self' https://accounts.google.com https://login.microsoftonline.com", ...RAZORPAY_ORIGINS.frame].join(' '),
+    ["frame-src 'self' https://accounts.google.com https://login.microsoftonline.com", ...RAZORPAY_ORIGINS.frame, ...TURNSTILE_ORIGINS.frame].join(' '),
   ].join('; ');
 }
 
@@ -63,7 +69,7 @@ export function buildCsp(env: IHeaderEnv): string {
  * to how pages are served and is NOT done here. Without a report endpoint the violations are visible in the browser console only.
  */
 export function buildReportOnlyCsp(env: IHeaderEnv): string {
-  return buildCsp(env).replace(/script-src [^;]*/, ["script-src 'self'", ...RAZORPAY_ORIGINS.script].join(' ')).replace(/style-src [^;]*/, "style-src 'self' https://fonts.googleapis.com");
+  return buildCsp(env).replace(/script-src [^;]*/, ["script-src 'self'", ...RAZORPAY_ORIGINS.script, ...TURNSTILE_ORIGINS.script].join(' ')).replace(/style-src [^;]*/, "style-src 'self' https://fonts.googleapis.com");
 }
 
 export const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()';
