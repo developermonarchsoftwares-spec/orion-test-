@@ -79,7 +79,7 @@ export class OAuthController {
         ipAddress,
       });
 
-      const redirectUrl = `${this.frontendUrl}/auth/callback?accessToken=${result.tokens.accessToken}&refreshToken=${result.tokens.refreshToken}&provider=google&isNewUser=${result.isNewUser}`;
+      const redirectUrl = `${this.frontendUrl}/auth/callback#accessToken=${encodeURIComponent(result.tokens.accessToken)}&refreshToken=${encodeURIComponent(result.tokens.refreshToken)}&provider=google&isNewUser=${result.isNewUser}`;
       return res.redirect(redirectUrl);
     } catch (err: any) {
       const errorMsg = encodeURIComponent(err.message || 'Google authentication failed');
@@ -130,7 +130,7 @@ export class OAuthController {
         ipAddress,
       });
 
-      const redirectUrl = `${this.frontendUrl}/auth/callback?accessToken=${result.tokens.accessToken}&refreshToken=${result.tokens.refreshToken}&provider=microsoft&isNewUser=${result.isNewUser}`;
+      const redirectUrl = `${this.frontendUrl}/auth/callback#accessToken=${encodeURIComponent(result.tokens.accessToken)}&refreshToken=${encodeURIComponent(result.tokens.refreshToken)}&provider=microsoft&isNewUser=${result.isNewUser}`;
       return res.redirect(redirectUrl);
     } catch (err: any) {
       const errorMsg = encodeURIComponent(err.message || 'Microsoft authentication failed');

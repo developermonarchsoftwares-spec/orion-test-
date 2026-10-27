@@ -28,12 +28,20 @@ function CallbackHandler() {
     executedRef.current = true;
 
     async function processAuth() {
-      const error = searchParams.get("error");
-      const accessToken = searchParams.get("accessToken");
-      const refreshToken = searchParams.get("refreshToken");
-      const isNewUser = searchParams.get("isNewUser") === "true";
-      const linked = searchParams.get("linked") === "true";
-      const provider = searchParams.get("provider");
+      // The tokens arrive in the URL fragment, which a browser never sends to any server (not in logs, not in a Referer header). A
+      // query-string copy is still read so a redirect issued by an older deployment keeps working.
+      const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const read = (key: string) => fromHash.get(key) ?? searchParams.get(key);
+      const error = read("error");
+      const accessToken = read("accessToken");
+      const refreshToken = read("refreshToken");
+      const isNewUser = read("isNewUser") === "true";
+      const linked = read("linked") === "true";
+      const provider = read("provider");
+      // take the tokens out of the address bar and the history entry as soon as they are read
+      if (window.location.hash || searchParams.has("accessToken") || searchParams.has("refreshToken")) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
 
       if (error) {
         if (!mountedRef.current) return;

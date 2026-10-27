@@ -63,6 +63,9 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { InputGuardMiddleware } from './common/middleware/input-guard.middleware';
 import { AuthenticationMiddleware } from './auth/auth.middleware';
 import { AppController } from './app.controller';
+import { Pool } from 'pg';
+import { PG_POOL } from './database/database.constants';
+import { DbThrottlerStorage } from './common/throttler/db-throttler.storage';
 
 @Module({
   controllers: [AppController, CronController],
@@ -86,13 +89,18 @@ import { AppController } from './app.controller';
 
     // Rate Limiting
     ThrottlerModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => [
-        {
-          ttl: config.get<number>('throttler.ttl', 60000),
-          limit: config.get<number>('throttler.limit', 100),
-        },
-      ],
+      inject: [ConfigService, PG_POOL],
+      useFactory: (config: ConfigService, pool: Pool) => ({
+        throttlers: [
+          {
+            ttl: config.get<number>('throttler.ttl', 60000),
+            limit: config.get<number>('throttler.limit', 100),
+          },
+        ],
+        // counters live in Postgres so every serverless instance shares them (falls back to memory if the table is unavailable)
+        // (the e2e suites reset limits through the default in-memory storage, so they keep it)
+        storage: process.env.NODE_ENV === 'test' ? undefined : new DbThrottlerStorage(pool),
+      }),
     }),
 
     // Infrastructure Modules

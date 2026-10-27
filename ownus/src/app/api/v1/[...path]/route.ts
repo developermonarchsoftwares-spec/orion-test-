@@ -13,6 +13,7 @@ import { findAdminAccount, fixedOtpAllowed } from '@/lib/admin-account';
 import { burnPasswordCheck, hashPassword, needsRehash, verifyPassword } from '@/lib/password';
 import { sendAdminOtpEmail, isAuthorizedAdminEmail, sendPasswordResetEmail, sendSignupOtpEmail, sendExistingAccountEmail } from '@/lib/email-service';
 import { checkCaptcha } from '@/lib/captcha';
+import { createSharedLimiter, type CounterPool } from '@/lib/shared-rate-limit';
 import { REGISTER_WITH_PROOF_SQL, parseProof, poolAdapter, registrationOtpRequired, sendEmailOtp, verifyEmailOtp } from '@/lib/email-otp';
 import { dispatchUserNotification } from '@/lib/notification-dispatcher';
 import { queryDb, queryDbStrict, DbWriteError, getDbPool } from '@/lib/db';
@@ -375,7 +376,7 @@ async function handleGoogleCallback(req: NextRequest): Promise<NextResponse> {
     const refreshToken = signJwt({ sub: userId, email, type: 'refresh' }, refreshSecret, 7 * 24 * 3600);
 
     const redirectUrl = new URL(
-      `/auth/callback?accessToken=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(
+      `/auth/callback#accessToken=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(
         refreshToken,
       )}&provider=google&isNewUser=${isNewUser}`,
       req.url,
@@ -416,25 +417,10 @@ function timingSafeHexEqual(a: string, b: string): boolean {
 
 /**
  * S-09: lightweight per-key limiter for the gateway's own credential endpoints (login, register, forgot-password),
- * which @nestjs/throttler does not cover. It is in-process, so on a multi-instance serverless deployment it only
- * limits per instance — a shared store (Postgres / Upstash) is the production-grade backing and is called out in
- * the infrastructure handoff. It still blocks single-instance and self-hosted credential stuffing.
+ * which @nestjs/throttler does not cover. Counters live in Postgres (rate_limit_counters) so every serverless instance
+ * shares them; per-instance memory is only the fallback when the database or the table is unavailable.
  */
-const gatewayRateStore = new Map<string, { count: number; resetAt: number }>();
-function gatewayRateLimited(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  if (gatewayRateStore.size > 10000) {
-    for (const [k, v] of gatewayRateStore) if (v.resetAt < now) gatewayRateStore.delete(k);
-  }
-  const entry = gatewayRateStore.get(key);
-  if (!entry || now > entry.resetAt) {
-    gatewayRateStore.set(key, { count: 1, resetAt: now + windowMs });
-    return false;
-  }
-  if (entry.count >= limit) return true;
-  entry.count++;
-  return false;
-}
+const gatewayRateLimited = createSharedLimiter(() => getDbPool() as CounterPool | null);
 function clientIpOf(req: NextRequest): string {
   const xff = req.headers.get('x-forwarded-for') || '';
   return (xff.split(',')[0] || req.headers.get('x-real-ip') || 'unknown').trim();
@@ -586,8 +572,8 @@ async function handleAdminVerifyOtp(req: NextRequest): Promise<NextResponse> {
   }
 
   // Second layer behind the per-code attempt cap (which is persisted and atomic): bounds code-guessing across successive codes.
-  // In-process, so per instance only (see gatewayRateLimited); the persisted per-code cap is what holds across instances.
-  if (gatewayRateLimited(`otpverify:acct:${email}`, 15, 5 * 60000) || gatewayRateLimited(`otpverify:ip:${clientIpOf(req)}`, 30, 5 * 60000)) {
+  // Counted in the shared store (see gatewayRateLimited); the persisted per-code cap below is the second line of defence.
+  if (await gatewayRateLimited(`otpverify:acct:${email}`, 15, 5 * 60000) || await gatewayRateLimited(`otpverify:ip:${clientIpOf(req)}`, 30, 5 * 60000)) {
     return tooManyRequests('Too many verification attempts. Please wait a few minutes and try again.');
   }
 
@@ -1486,7 +1472,7 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
   }
 
   // S-09: throttle credential stuffing per source IP and per targeted account.
-  if (gatewayRateLimited(`login:ip:${clientIpOf(req)}`, 30, 5 * 60000) || gatewayRateLimited(`login:acct:${email}`, 10, 5 * 60000)) {
+  if (await gatewayRateLimited(`login:ip:${clientIpOf(req)}`, 30, 5 * 60000) || await gatewayRateLimited(`login:acct:${email}`, 10, 5 * 60000)) {
     return tooManyRequests('Too many login attempts. Please wait a few minutes and try again.');
   }
 
@@ -1655,7 +1641,7 @@ async function handleSendOtp(req: NextRequest): Promise<NextResponse> {
   const body = await readJson(req).catch(() => null);
   if (body === null) return NextResponse.json({ success: false, statusCode: 400, message: 'Invalid JSON body' }, { status: 400 });
   const ip = clientIpOf(req);
-  if (gatewayRateLimited(`otp-send:ip:${ip}`, 12, 10 * 60000)) return tooManyRequests('Too many verification requests. Please wait a few minutes and try again.');
+  if (await gatewayRateLimited(`otp-send:ip:${ip}`, 12, 10 * 60000)) return tooManyRequests('Too many verification requests. Please wait a few minutes and try again.');
   const captchaRejection = await checkCaptcha(body?.captchaToken, ip);
   if (captchaRejection) {
     return NextResponse.json({ success: false, statusCode: captchaRejection.status, errorCode: captchaRejection.errorCode, message: captchaRejection.message }, { status: captchaRejection.status });
@@ -1676,7 +1662,7 @@ async function handleSendOtp(req: NextRequest): Promise<NextResponse> {
 async function handleVerifyOtp(req: NextRequest): Promise<NextResponse> {
   const body = await readJson(req).catch(() => null);
   if (body === null) return NextResponse.json({ success: false, statusCode: 400, message: 'Invalid JSON body' }, { status: 400 });
-  if (gatewayRateLimited(`otp-verify:ip:${clientIpOf(req)}`, 30, 10 * 60000)) return tooManyRequests('Too many attempts. Please wait a few minutes and try again.');
+  if (await gatewayRateLimited(`otp-verify:ip:${clientIpOf(req)}`, 30, 10 * 60000)) return tooManyRequests('Too many attempts. Please wait a few minutes and try again.');
   const pool = getDbPool();
   if (!pool) return NextResponse.json({ success: false, statusCode: 503, errorCode: 'SERVICE_UNAVAILABLE', message: 'Verification is temporarily unavailable.' }, { status: 503 });
   const result = await verifyEmailOtp(poolAdapter(pool as any), { email: body?.email, otp: body?.otp, purpose: body?.purpose });
@@ -1701,7 +1687,7 @@ async function handleRegister(req: NextRequest): Promise<NextResponse> {
   }
 
   // S-09: throttle automated sign-up abuse per source IP.
-  if (gatewayRateLimited(`register:ip:${clientIpOf(req)}`, 10, 10 * 60000)) {
+  if (await gatewayRateLimited(`register:ip:${clientIpOf(req)}`, 10, 10 * 60000)) {
     return tooManyRequests('Too many sign-up attempts. Please wait a few minutes and try again.');
   }
 
@@ -1943,7 +1929,7 @@ async function handleForgotPassword(req: NextRequest): Promise<NextResponse> {
   if (!jwtSecret) return authNotConfigured();
 
   // S-09: throttle reset-email flooding, per source IP and per targeted address.
-  if (gatewayRateLimited(`forgot:ip:${clientIpOf(req)}`, 10, 10 * 60000) || gatewayRateLimited(`forgot:acct:${email}`, 5, 10 * 60000)) {
+  if (await gatewayRateLimited(`forgot:ip:${clientIpOf(req)}`, 10, 10 * 60000) || await gatewayRateLimited(`forgot:acct:${email}`, 5, 10 * 60000)) {
     return tooManyRequests('Too many password reset requests. Please wait a few minutes and try again.');
   }
 
@@ -2532,7 +2518,7 @@ async function handleUpdateUserPassword(req: NextRequest): Promise<NextResponse>
   }
 
   // The current password is verified here, so a stolen session token could otherwise be used to guess it without limit.
-  if (gatewayRateLimited(`pwchange:${userId || email}`, 5, 10 * 60000)) {
+  if (await gatewayRateLimited(`pwchange:${userId || email}`, 5, 10 * 60000)) {
     return tooManyRequests('Too many password change attempts. Please wait a few minutes and try again.');
   }
 

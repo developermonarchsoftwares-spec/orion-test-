@@ -19,3 +19,4 @@ export * from './integrations';
 export * from './traffic';
 export * from './privacy';
 export * from './email_otps';
+export * from './rate_limits';

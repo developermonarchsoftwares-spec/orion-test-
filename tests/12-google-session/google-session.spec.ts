@@ -74,7 +74,7 @@ test.describe('PHASE 14: Google sign-in, sessions and logout', () => {
     await expect(page).toHaveURL(/\/login\?error=/);
     const state = await googleState(request);
     const first = await request.get(`${API}/auth/google/callback?code=${encodeURIComponent('sim_google_' + email)}&state=${encodeURIComponent(state)}`, { maxRedirects: 0 });
-    expect(first.headers()['location']).toMatch(/\/auth\/callback\?accessToken=/);
+    expect(first.headers()['location']).toMatch(/\/auth\/callback#accessToken=/);
     const replay = await request.get(`${API}/auth/google/callback?code=${encodeURIComponent('sim_google_' + email)}&state=${encodeURIComponent(state)}`, { maxRedirects: 0 });
     expect(replay.headers()['location']).toMatch(/\/login\?error=/);
   });
@@ -86,7 +86,7 @@ test.describe('PHASE 14: Google sign-in, sessions and logout', () => {
     const state = await googleState(request);
     const res = await request.get(`${API}/auth/google/callback?code=${encodeURIComponent('sim_google_' + user.email)}&state=${encodeURIComponent(state)}`, { maxRedirects: 0 });
     const location = res.headers()['location'];
-    expect(location).toMatch(/\/auth\/callback\?accessToken=/);
+    expect(location).toMatch(/\/auth\/callback#accessToken=/);
     expect(location).toMatch(/isNewUser=false/);
   });
 
