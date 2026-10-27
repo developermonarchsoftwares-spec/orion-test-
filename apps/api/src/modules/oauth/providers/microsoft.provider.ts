@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { IOAuthProvider, IOAuthTokens, IOAuthUserProfile } from '../interfaces/oauth-provider.interface';
 import { BusinessException } from '../../../common/errors/business.exception';
 import { oauthSimulationAllowed } from '../oauth-simulation';
+import { defaultOAuthCallbackUrl } from '../oauth-urls';
 
 @Injectable()
 export class MicrosoftOAuthProvider implements IOAuthProvider {
@@ -26,7 +27,7 @@ export class MicrosoftOAuthProvider implements IOAuthProvider {
       .replace(/^["']|["']$/g, '');
     this.callbackUrl = (
       this.configService.get<string>('MICROSOFT_CALLBACK_URL') ||
-      'http://localhost:4000/api/v1/auth/microsoft/callback'
+      defaultOAuthCallbackUrl('microsoft')
     )
       .trim()
       .replace(/^["']|["']$/g, '');

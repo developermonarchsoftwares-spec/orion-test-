@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { IJwtPayload } from '@orion/shared';
 import { Throttle } from '@nestjs/throttler';
 import { OAuthProviderDto, OAuthTokenDto } from './dto/oauth.dto';
+import { oauthFrontendUrl } from './oauth-urls';
 
 @ApiTags('OAuth & Enterprise Identity')
 @Controller('auth')
@@ -32,8 +33,7 @@ export class OAuthController {
     private readonly oauthService: OAuthService,
     private readonly configService: ConfigService,
   ) {
-    this.frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    this.frontendUrl = oauthFrontendUrl({ ...process.env, FRONTEND_URL: this.configService.get<string>('FRONTEND_URL') ?? process.env.FRONTEND_URL });
   }
 
   @Public()

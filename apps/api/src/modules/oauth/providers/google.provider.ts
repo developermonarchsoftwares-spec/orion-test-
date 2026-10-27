@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { IOAuthProvider, IOAuthTokens, IOAuthUserProfile } from '../interfaces/oauth-provider.interface';
 import { BusinessException } from '../../../common/errors/business.exception';
 import { oauthSimulationAllowed } from '../oauth-simulation';
+import { defaultOAuthCallbackUrl } from '../oauth-urls';
 
 @Injectable()
 export class GoogleOAuthProvider implements IOAuthProvider {
@@ -28,7 +29,7 @@ export class GoogleOAuthProvider implements IOAuthProvider {
     this.clientId = this.sanitizeValue(this.configService.get<string>('GOOGLE_CLIENT_ID'), 'GOOGLE_CLIENT_ID');
     this.clientSecret = this.sanitizeValue(this.configService.get<string>('GOOGLE_CLIENT_SECRET'), 'GOOGLE_CLIENT_SECRET');
     let rawCallback = this.sanitizeValue(this.configService.get<string>('GOOGLE_CALLBACK_URL'), 'GOOGLE_CALLBACK_URL');
-    this.callbackUrl = rawCallback || 'https://orion-api-snowy.vercel.app/api/v1/auth/google/callback';
+    this.callbackUrl = rawCallback || defaultOAuthCallbackUrl('google');
 
     const isConfig = this.isConfigured();
     const suffix = isConfig && this.clientId.length >= 4 
@@ -51,6 +52,14 @@ export class GoogleOAuthProvider implements IOAuthProvider {
       throw new BusinessException(
         'Google OAuth client ID is not configured. Please define GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in apps/api/.env',
         'GOOGLE_CLIENT_ID_MISSING',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (!this.callbackUrl) {
+      throw new BusinessException(
+        'Google OAuth callback URL is not configured. Please define GOOGLE_CALLBACK_URL (or WEB_APP_URL).',
+        'GOOGLE_CALLBACK_URL_MISSING',
         HttpStatus.BAD_REQUEST,
       );
     }
