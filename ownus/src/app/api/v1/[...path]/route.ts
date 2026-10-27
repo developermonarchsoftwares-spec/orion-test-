@@ -78,6 +78,12 @@ function appBaseUrl(req: NextRequest): string {
   if (configured && /^https?:\/\//i.test(configured)) {
     return configured.replace(/\/+$/, '');
   }
+  // On Vercel's production environment the platform itself provides the project's production domain. It is not request-controlled, so it
+  // is safe to put in an e-mailed link, and it stops a missing APP_URL from producing a localhost link (a dead page for the recipient).
+  const vercelProduction = sanitizeEnvValue(process.env.VERCEL_PROJECT_PRODUCTION_URL).replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  if (process.env.VERCEL_ENV === 'production' && vercelProduction) {
+    return `https://${vercelProduction}`;
+  }
   const host = (req.headers.get('host') || req.nextUrl.host || 'localhost:3000').split(',')[0].trim();
   const hostname = host.split(':')[0].toLowerCase();
   if (LOCAL_RESET_HOSTS.has(hostname) || hostname.endsWith('.localhost')) {
