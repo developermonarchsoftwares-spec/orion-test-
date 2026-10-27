@@ -231,6 +231,14 @@ export interface SendPreferenceEmailParams {
   link?: string;
 }
 
+function notificationLinkBase(): string {
+  const configured = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '').trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '');
+  if (configured) return configured;
+  const vercel = (process.env.VERCEL_PROJECT_PRODUCTION_URL || '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  if (process.env.VERCEL_ENV === 'production' && vercel) return `https://${vercel}`;
+  return 'http://localhost:3000';
+}
+
 export async function sendPreferenceNotificationEmail(params: SendPreferenceEmailParams): Promise<SendEmailResult> {
   const { email, name, title, message, type, link } = params;
   const resendApiKey = getResendApiKey();
@@ -263,7 +271,7 @@ export async function sendPreferenceNotificationEmail(params: SendPreferenceEmai
               <p style="margin: 0 0 24px 0; color: #d4d4d8; font-size: 14px; line-height: 1.6;">${escapeHtml(message)}</p>
               ${
                 link
-                  ? `<a href="http://localhost:3000${link}" style="display: inline-block; background-color: #ffffff; color: #09090b; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 13px; text-decoration: none;">View in Orion</a>`
+                  ? `<a href="${escapeHtml(notificationLinkBase())}${escapeHtml(link)}" style="display: inline-block; background-color: #ffffff; color: #09090b; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 13px; text-decoration: none;">View in Orion</a>`
                   : ''
               }
               <p style="margin: 24px 0 0 0; color: #71717a; font-size: 11px;">You received this automated notification because your '${type}' preference is enabled in Orion Settings.</p>

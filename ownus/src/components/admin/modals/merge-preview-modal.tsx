@@ -12,14 +12,16 @@ interface MergePreviewModalProps {
   onConfirmMerge: (pairId: string, mergedRecord: AdminBusinessRecord) => void;
 }
 
-export function MergePreviewModal({
+export function MergePreviewModal({ pair, isOpen, ...rest }: MergePreviewModalProps) {
+  if (!isOpen || !pair) return null;
+  return <MergePreviewBody pair={pair} {...rest} />;
+}
+
+function MergePreviewBody({
   pair,
-  isOpen,
   onClose,
   onConfirmMerge
-}: MergePreviewModalProps) {
-  if (!isOpen || !pair) return null;
-
+}: Omit<MergePreviewModalProps, 'pair' | 'isOpen'> & { pair: DuplicatePair }) {
   const { original, duplicate, confidenceScore, matchReasons, matchingFields } = pair;
 
   // Selected source for each field ('original' | 'duplicate')
