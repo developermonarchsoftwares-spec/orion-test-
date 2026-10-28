@@ -31,6 +31,25 @@ describe('resend mail transport', () => {
     expect(JSON.parse(init.body)).toMatchObject({ from: 'Monarch Security <security@monarchsoftwares.com>', to: ['new.user@example.com'], subject: mail.subject, text: mail.text });
   });
 
+  it('logs the provider message id (never the recipient or the body) so a delivery can be traced', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 'msg_abc123' }) }) as never;
+    const log = jest.spyOn(require('@nestjs/common').Logger.prototype, 'log').mockImplementation(() => undefined);
+    try {
+      expect(await new MailService({} as never).sendChecked(mail)).toBe(true);
+      const line = String(log.mock.calls.map((c) => c[0]).find((m) => String(m).includes('[mail:resend]')));
+      expect(line).toContain('id=msg_abc123');
+      expect(line).not.toContain('new.user@example.com');
+      expect(line).not.toContain('123456');
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('still reports delivered when the provider answer has no readable body', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => { throw new Error('empty'); } }) as never;
+    expect(await new MailService({} as never).sendChecked(mail)).toBe(true);
+  });
+
   it('reports a refused send as not delivered, without throwing', async () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 403 }) as never;
     expect(await new MailService({} as never).sendChecked(mail)).toBe(false);

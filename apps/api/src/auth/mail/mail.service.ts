@@ -83,6 +83,10 @@ export class MailService {
           signal: AbortSignal.timeout(10_000),
         });
         if (!res.ok) throw new Error(`resend responded ${res.status}`); // the response body is not logged: it can echo the recipient
+        // Resend's message id proves the provider accepted the message (it is not an address and not a secret), so a delivery can be traced
+        // in the provider's dashboard even though the body is never logged.
+        const accepted = (await Promise.resolve().then(() => res.json()).catch(() => ({}))) as { id?: unknown };
+        this.logger.log(`[mail:resend] accepted "${mail.subject}" id=${typeof accepted.id === 'string' ? accepted.id : 'unknown'}`);
         return true;
       }
       if (mode === 'log') {
