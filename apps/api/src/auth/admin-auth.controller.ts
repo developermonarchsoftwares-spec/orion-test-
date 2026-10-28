@@ -9,6 +9,7 @@ import {
   BadRequestException,
   ForbiddenException,
   HttpException,
+  ServiceUnavailableException,
   Res,
   Optional,
   Inject,
@@ -30,6 +31,8 @@ import { AuditLogService } from '../common/services/audit-log.service';
 import { IJwtPayload } from '@orion/shared';
 import { CsvSecurityUtil } from '../common/utils/csv-security.util';
 import { hashOtp, timingSafeHexEqual } from './admin-otp.util';
+import { MailService } from './mail/mail.service';
+import { buildAdminOtpMail } from './mail/admin-otp.mail';
 
 const LOCAL_DB_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 function isLocalDbUrl(url: string | undefined): boolean {
@@ -63,6 +66,7 @@ export class AdminAuthController {
     private readonly authTokenService: AuthTokenService,
     @Inject(DRIZZLE_DATABASE) private readonly db: DrizzleDb,
     @Optional() private readonly auditLogService?: AuditLogService,
+    @Optional() private readonly mail?: MailService,
   ) {}
 
   /** The persisted account for this email when it is an ACTIVE ADMIN or SUPER_ADMIN; otherwise undefined. */
@@ -149,8 +153,27 @@ export class AdminAuthController {
         expiresAt: new Date(Date.now() + ttlSeconds * 1000),
       });
     } catch (err: any) {
-      // In case of transient db issue, log error
+      // A code that was not stored can never be verified, so it is not e-mailed and the administrator is told to retry.
       this.logger.error(`Failed to store OTP in the database: ${err.message}`, err.stack);
+      throw new ServiceUnavailableException('We could not create a verification code right now. Please try again in a moment.');
+    }
+
+    // The code only exists to be read from an e-mail, so it is sent here (the web gateway forwards this request to the API and does not send
+    // anything itself). Local automated tests use the fixed code and read it from the response instead of a mailbox.
+    if (!fixedOtpAllowed()) {
+      const delivered = this.mail ? await this.mail.sendChecked(buildAdminOtpMail(email, otp, Math.round(ttlSeconds / 60))) : false;
+      if (!delivered) {
+        // The code never left: remove it so the administrator can ask again at once instead of waiting out the resend delay for nothing.
+        await this.db.delete(adminOtps).where(eq(adminOtps.email, email)).catch(() => undefined);
+        await this.auditLogService?.record({
+          action: 'ADMIN_OTP_SEND_FAILED',
+          entityType: 'ADMIN_AUTH',
+          entityId: crypto.createHash('sha256').update(email).digest('hex').slice(0, 16),
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+        throw new ServiceUnavailableException('We could not send the verification code right now. Please try again in a moment.');
+      }
     }
 
     await this.auditLogService?.record({
