@@ -2,9 +2,13 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
-/** The public site key. Unset means the CAPTCHA is off (local development), and forms must not wait for a token. */
+/** The public site key (shipped to every browser by design; the secret half only ever lives on the server). */
 export const TURNSTILE_SITE_KEY = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "").trim();
-export const captchaEnabled = TURNSTILE_SITE_KEY.length > 0;
+/**
+ * The challenge is mandatory: with a site key, forms wait for a token; in production without one they stay blocked (a missing key must not
+ * quietly remove the protection). Only local development without a key lets a form through without a token.
+ */
+export const captchaEnabled = TURNSTILE_SITE_KEY.length > 0 || process.env.NODE_ENV === "production";
 
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
@@ -112,5 +116,12 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
   }, [appearance]);
 
   if (!captchaEnabled) return null;
+  if (!TURNSTILE_SITE_KEY) {
+    return (
+      <p role="alert" className="text-center text-xs text-red-600 dark:text-red-400" data-testid="captcha-unconfigured">
+        The security check is not available right now, so this form is paused. Please try again later.
+      </p>
+    );
+  }
   return <div ref={containerRef} className={className} data-testid="captcha-widget" />;
 });

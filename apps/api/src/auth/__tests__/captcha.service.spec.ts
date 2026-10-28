@@ -17,6 +17,15 @@ describe('CaptchaService', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
+  it('is mandatory in production: with no secret the request is refused (503), never passed', async () => {
+    const spy = jest.spyOn(global, 'fetch');
+    const prod = env({ NODE_ENV: 'production' });
+    expect(svc.isEnabled(prod)).toBe(true);
+    await expect(svc.assertHuman('any-token', '1.2.3.4', prod)).rejects.toMatchObject({ response: { errorCode: 'CAPTCHA_UNAVAILABLE', statusCode: 503 } });
+    await expect(svc.assertHuman(undefined, '1.2.3.4', prod)).rejects.toMatchObject({ response: { errorCode: 'CAPTCHA_UNAVAILABLE' } });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
   it('rejects a missing, empty or oversized token without calling Cloudflare', async () => {
     const spy = jest.spyOn(global, 'fetch');
     for (const bad of [undefined, '', '   ', 'x'.repeat(5000), 42]) {

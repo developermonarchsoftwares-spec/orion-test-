@@ -16,20 +16,30 @@ const clean = (v?: string) => String(v ?? '').replace(/[\r\n]+/g, '').trim().rep
  * Server-side Cloudflare Turnstile verification. The browser's token is never trusted on its own: it is checked with Cloudflare using the
  * secret key, once (Cloudflare rejects a token it has already redeemed), and bound to the caller's IP when known.
  *
- * The check is active when TURNSTILE_SECRET_KEY is set. With no secret it is off (local development and the automated test suites), so a
- * deployment that has not been given keys keeps working instead of locking everyone out.
+ * The check is MANDATORY in production: with TURNSTILE_SECRET_KEY set every request needs a valid token, and in production with no secret
+ * the request is refused (503) instead of being let through, so a missing key can never silently switch the protection off. It is off only
+ * outside production (local development and the automated test suites).
  */
 @Injectable()
 export class CaptchaService {
   private readonly logger = new Logger(CaptchaService.name);
 
   isEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-    return clean(env.TURNSTILE_SECRET_KEY).length > 0;
+    return clean(env.TURNSTILE_SECRET_KEY).length > 0 || this.mustBeConfigured(env);
+  }
+
+  /** Production with no secret: the check cannot run, so the request must not pass. */
+  private mustBeConfigured(env: NodeJS.ProcessEnv): boolean {
+    return env.NODE_ENV === 'production';
   }
 
   async assertHuman(token: unknown, ip?: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
     const secret = clean(env.TURNSTILE_SECRET_KEY);
-    if (!secret) return;
+    if (!secret) {
+      if (!this.mustBeConfigured(env)) return;
+      this.logger.error('CAPTCHA is required in production but TURNSTILE_SECRET_KEY is not set; refusing the request');
+      throw new BusinessException(CAPTCHA_MESSAGES.unavailable, 'CAPTCHA_UNAVAILABLE', HttpStatus.SERVICE_UNAVAILABLE);
+    }
 
     if (typeof token !== 'string' || !token.trim() || token.length > MAX_TOKEN_LENGTH) {
       throw new BusinessException(CAPTCHA_MESSAGES.required, 'CAPTCHA_REQUIRED', HttpStatus.BAD_REQUEST);

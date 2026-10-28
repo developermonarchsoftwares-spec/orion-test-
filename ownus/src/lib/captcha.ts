@@ -3,7 +3,8 @@
  * which guards the NestJS API). Server-only: it holds the secret key. When the gateway proxies to the API the API does the check; this
  * runs only on the native fallback path.
  *
- * Active when TURNSTILE_SECRET_KEY is set. With no secret it is off, so a deployment without keys keeps working.
+ * Mandatory in production: with TURNSTILE_SECRET_KEY set every request needs a valid token, and in production with no secret the request is
+ * refused (503) instead of passing. Off only outside production (local development and the automated test suites).
  */
 
 const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
@@ -23,8 +24,10 @@ export interface CaptchaRejection {
 
 const clean = (v?: string) => String(v ?? '').replace(/[\r\n]+/g, '').trim().replace(/^["'`]|["'`]$/g, '').trim();
 
+const mustBeConfigured = (env: NodeJS.ProcessEnv) => env.NODE_ENV === 'production';
+
 export function isCaptchaEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return clean(env.TURNSTILE_SECRET_KEY).length > 0;
+  return clean(env.TURNSTILE_SECRET_KEY).length > 0 || mustBeConfigured(env);
 }
 
 /** Resolves to null when the visitor passed (or the check is off), otherwise to the rejection to send back. */
@@ -35,7 +38,11 @@ export async function checkCaptcha(
   fetchImpl: typeof fetch = fetch,
 ): Promise<CaptchaRejection | null> {
   const secret = clean(env.TURNSTILE_SECRET_KEY);
-  if (!secret) return null;
+  if (!secret) {
+    if (!mustBeConfigured(env)) return null;
+    console.error('[CAPTCHA] required in production but TURNSTILE_SECRET_KEY is not set; refusing the request');
+    return { status: 503, errorCode: 'CAPTCHA_UNAVAILABLE', message: CAPTCHA_MESSAGES.unavailable };
+  }
 
   if (typeof token !== 'string' || !token.trim() || token.length > MAX_TOKEN_LENGTH) {
     return { status: 400, errorCode: 'CAPTCHA_REQUIRED', message: CAPTCHA_MESSAGES.required };

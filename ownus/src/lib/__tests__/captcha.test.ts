@@ -14,6 +14,17 @@ describe('gateway CAPTCHA check', () => {
     assert.equal(called, false);
   });
 
+  it('is mandatory in production: with no secret the request is refused, never passed', async () => {
+    let called = false;
+    const spy = (async () => { called = true; return {} as Response; }) as typeof fetch;
+    const prodNoSecret = { NODE_ENV: 'production' } as unknown as NodeJS.ProcessEnv;
+    assert.equal(isCaptchaEnabled(prodNoSecret), true);
+    const r = await checkCaptcha('any-token', '1.2.3.4', prodNoSecret, spy);
+    assert.equal(r?.errorCode, 'CAPTCHA_UNAVAILABLE');
+    assert.equal(r?.status, 503);
+    assert.equal(called, false);
+  });
+
   it('requires a usable token when a secret is configured', async () => {
     for (const bad of [undefined, '', '  ', 'x'.repeat(5000), 7]) {
       const r = await checkCaptcha(bad, '1.2.3.4', ON, reply({ success: true }));
