@@ -18,6 +18,8 @@ process.env.DATABASE_URL = 'postgresql://e2e:e2e@127.0.0.1:1/never_connects';
 process.env.REQUIRE_REGISTRATION_OTP = 'false';
 // Same for the sign-up consent requirement (DPDP Act): its own suite switches it on. Ignored in production.
 process.env.REQUIRE_SIGNUP_CONSENT = 'false';
+// One process runs every e2e suite, so its heap is far above a single instance's; the /health memory check must not fail the health suite for that.
+process.env.HEALTH_HEAP_LIMIT_MB = '8192';
 // A developer's own .env may enable real Razorpay orders (RAZORPAY_API_MODE=live). The suites must never reach the network, so the mode is
 // pinned off here exactly like DATABASE_URL; the live-mode behaviour has its own suite that injects a fake gateway.
 process.env.RAZORPAY_API_MODE = 'off';

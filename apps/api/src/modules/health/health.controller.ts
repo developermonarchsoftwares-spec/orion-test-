@@ -1,3 +1,4 @@
+import { heapLimitBytes } from './heap-limit';
 import { Controller, Get, HttpStatus, Param, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -55,7 +56,7 @@ export class HealthController {
       () => this.typesenseIndicator.isHealthy('typesense'),
       () => this.redisIndicator.isHealthy('redis'),
       () => this.storageIndicator.isHealthy('storage'),
-      () => this.memory.checkHeap('memory_heap', 1024 * 1024 * 1024), // 1GB limit
+      () => this.memory.checkHeap('memory_heap', heapLimitBytes()), // 1 GiB unless HEALTH_HEAP_LIMIT_MB says otherwise
     ]);
   }
 
