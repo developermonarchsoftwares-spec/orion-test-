@@ -9,8 +9,10 @@ import { describe, it } from 'node:test';
  * over HTTP against a built server and a disposable database (docs/API_CONTRACT_REVIEW.md, section 6).
  */
 const root = path.resolve(import.meta.dirname, '..', '..');
-const route = fs.readFileSync(path.join(root, 'app', 'api', 'v1', '[...path]', 'route.ts'), 'utf8');
-const db = fs.readFileSync(path.join(root, 'lib', 'db.ts'), 'utf8');
+// Source is compared as text with "\n" in the snippets below; a Windows checkout (core.autocrlf) holds "\r\n", so line endings are normalised
+const readSource = (...segments: string[]) => fs.readFileSync(path.join(root, ...segments), 'utf8').replace(/\r\n/g, '\n');
+const route = readSource('app', 'api', 'v1', '[...path]', 'route.ts');
+const db = readSource('lib', 'db.ts');
 
 describe('gateway contract guards (Phase 28)', () => {
   it('every body is read through readJson: a body of null, a number or a string never reaches a handler as such', () => {
