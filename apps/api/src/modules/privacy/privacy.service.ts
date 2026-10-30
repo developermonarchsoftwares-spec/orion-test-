@@ -23,6 +23,8 @@ interface IRetentionRule {
   where: ReturnType<typeof sql>;
   update?: ReturnType<typeof sql>;
 }
+/** privacy_requests.note on a deletion that started because the account consent was withdrawn (so giving consent back can cancel exactly that one). */
+export const WITHDRAWAL_NOTE = 'CONSENT_WITHDRAWN';
 const hashEmail = (email: string) => createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
 
 /** The part of a database handle that a transaction and the database share. */
@@ -117,16 +119,67 @@ export class PrivacyService {
   }
 
   async setConsent(userId: string, purpose: string, granted: boolean, ctx: IRequestContext, source = 'settings') {
-    await this.db.insert(s.consentRecords).values({
-      userId,
-      purpose,
-      granted,
-      policyVersion: POLICY_VERSION,
-      source,
-      ipAddress: ctx.ip,
-      userAgent: ctx.userAgent,
+    // Withdrawing the account consent (DPDP Act) ends the lawful basis for holding the account, so it schedules the account for closure
+    // in the same transaction as the ledger row. Giving the consent back cancels a closure that withdrawal started (never one the person
+    // asked for themselves). The usual 7-day cooling-off applies.
+    let closure: { executeAfter: Date; created: boolean; email: string } | null = null;
+    await this.db.transaction(async (tx) => {
+      await tx.insert(s.consentRecords).values({
+        userId,
+        purpose,
+        granted,
+        policyVersion: POLICY_VERSION,
+        source,
+        ipAddress: ctx.ip,
+        userAgent: ctx.userAgent,
+      });
+      if (purpose !== 'ACCOUNT_SERVICE') return;
+      if (granted) {
+        await tx
+          .update(s.privacyRequests)
+          .set({ status: 'CANCELLED', completedAt: new Date() })
+          .where(and(eq(s.privacyRequests.userId, userId), eq(s.privacyRequests.type, 'DELETE'), eq(s.privacyRequests.status, 'PENDING'), eq(s.privacyRequests.note, WITHDRAWAL_NOTE)));
+        return;
+      }
+      const [user] = await tx.select().from(s.users).where(eq(s.users.id, userId)).limit(1);
+      if (!user || user.deletedAt) return;
+      const [open] = await tx
+        .select()
+        .from(s.privacyRequests)
+        .where(and(eq(s.privacyRequests.userId, userId), eq(s.privacyRequests.type, 'DELETE'), eq(s.privacyRequests.status, 'PENDING')))
+        .limit(1);
+      if (open) {
+        closure = { executeAfter: open.executeAfter!, created: false, email: user.email }; // a deletion is already scheduled: keep it
+        return;
+      }
+      const now = Date.now();
+      const [req] = await tx
+        .insert(s.privacyRequests)
+        .values({
+          userId,
+          emailHash: hashEmail(user.email),
+          type: 'DELETE',
+          status: 'PENDING',
+          note: WITHDRAWAL_NOTE,
+          executeAfter: new Date(now + DELETION_GRACE_MS),
+          dueAt: new Date(now + REQUEST_DEADLINE_MS),
+        })
+        .returning();
+      closure = { executeAfter: req.executeAfter!, created: true, email: user.email };
     });
-    return this.getConsents(userId);
+
+    const scheduled = closure as { executeAfter: Date; created: boolean; email: string } | null;
+    if (scheduled?.created) {
+      await this.audit?.record({ userId, action: 'PRIVACY_CONSENT_WITHDRAWN_CLOSURE', entityType: 'user', entityId: userId, ipAddress: ctx.ip, userAgent: ctx.userAgent });
+      await this.mail
+        ?.send({
+          to: scheduled.email,
+          subject: 'Your Orion account will be closed',
+          text: `You withdrew your consent for Orion to process your account data, so your account will be erased on ${scheduled.executeAfter.toUTCString()}. If you did this by mistake, sign in and agree again before then to keep your account.`,
+        })
+        .catch((e: Error) => this.logger.warn(`Withdrawal e-mail failed: ${e.message}`));
+    }
+    return { ...(await this.getConsents(userId)), accountClosure: scheduled ? { executeAfter: scheduled.executeAfter.toISOString() } : null };
   }
 
   // ---------------- access / portability (GDPR Art. 15, 20; CCPA right to know) ----------------

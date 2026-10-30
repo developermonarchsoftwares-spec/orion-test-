@@ -5,6 +5,34 @@ export const POLICY_VERSION = '2026-10-07';
 export const CONSENT_PURPOSES = ['ACCOUNT_SERVICE', 'ANALYTICS', 'MARKETING', 'PRODUCT_UPDATES', 'SALE_SHARING'] as const;
 export type ConsentPurpose = (typeof CONSENT_PURPOSES)[number];
 
+/**
+ * A new account must carry the person's explicit ACCOUNT_SERVICE consent. Always on in production; elsewhere it can be switched off
+ * (REQUIRE_SIGNUP_CONSENT=false) so local development and the suites that register accounts directly keep working. Same shape as
+ * registrationOtpRequired.
+ */
+export function signupConsentRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+  if ((env.NODE_ENV || '').trim() === 'production') return true;
+  return !/^(0|false|no|off)$/i.test((env.REQUIRE_SIGNUP_CONSENT || '').trim());
+}
+
+/** The purposes a sign-up form can send. ACCOUNT_SERVICE is required; the others are optional and recorded as given (a refusal is recorded too). */
+export const SIGNUP_CONSENT_PURPOSES = ['ACCOUNT_SERVICE', 'PRODUCT_UPDATES', 'MARKETING'] as const;
+
+export type SignupConsentPurpose = (typeof SIGNUP_CONSENT_PURPOSES)[number];
+
+/**
+ * Reads the consent choices sent with a sign-up. Only a real boolean true counts as consent to the account purpose (a string such as "true"
+ * does not). Optional purposes are kept when they are real booleans, so an explicit refusal is recorded too.
+ */
+export function parseSignupConsents(raw: unknown): { accountService: boolean; rows: Array<{ purpose: SignupConsentPurpose; granted: boolean }> } {
+  const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const accountService = o.ACCOUNT_SERVICE === true;
+  const rows: Array<{ purpose: SignupConsentPurpose; granted: boolean }> = [];
+  if (accountService) rows.push({ purpose: 'ACCOUNT_SERVICE', granted: true });
+  for (const purpose of ['PRODUCT_UPDATES', 'MARKETING'] as const) if (typeof o[purpose] === 'boolean') rows.push({ purpose, granted: o[purpose] as boolean });
+  return { accountService, rows };
+}
+
 /** DPDP Act (India) Data Principal requests taken by the public form. Stored in data_subject_requests, whose `type` is varchar(12). */
 export const RIGHTS_REQUEST_TYPES = ['ACCESS', 'CORRECTION', 'ERASURE', 'WITHDRAWAL', 'GRIEVANCE', 'NOMINATION'] as const;
 export type RightsRequestType = (typeof RIGHTS_REQUEST_TYPES)[number];

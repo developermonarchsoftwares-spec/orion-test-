@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import { GRIEVANCE, LEGAL_REVIEW_PENDING, PURPOSES, RIGHTS, RIGHTS_TYPE_LABEL, THIRD_PARTIES } from '../compliance.ts';
 import { EMPTY_RIGHTS_FORM, RIGHTS_TYPES, validateRightsForm } from '../rights-request.ts';
 import { TRACKERS, planTrackers, type ITracker } from '../trackers.ts';
+import { gateExempt, gateStateFor } from '../consent-gate.ts';
 
 /** DPDP Act work: tracker gating, consent purposes, the rights form, and source-level checks that the pages carry the required elements. */
 const src = (...p: string[]) => fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', ...p), 'utf8').replace(/\r\n/g, '\n');
@@ -43,7 +44,9 @@ describe('consent purposes', () => {
     assert.match(page, /useState\(false\)/);
     assert.doesNotMatch(page, /defaultChecked|useState<ConsentChoices>\(\{\s*\w+:\s*true/);
     assert.match(page, /<ConsentCheckboxes/);
-    assert.match(page, /recordConsents\(/);
+    // the choices travel with the sign-up request and the server writes them in the same step as the account
+    assert.match(page, /consents: \{ ACCOUNT_SERVICE: true, PRODUCT_UPDATES: consents\.PRODUCT_UPDATES === true, MARKETING: consents\.MARKETING === true \}/);
+    assert.doesNotMatch(page, /recordConsents\(/);
     assert.match(page, /!consents\.ACCOUNT_SERVICE/);
     const boxes = src('components', 'privacy', 'consent-checkboxes.tsx');
     assert.match(boxes, /checked=\{value\[p\.id\] === true\}/);
@@ -105,5 +108,44 @@ describe('required DPDP elements are published', () => {
   it('the banner can be reopened from the footer and the loader is mounted', () => {
     assert.match(src('components', 'privacy', 'consent-banner.tsx'), /orion:open-consent/);
     assert.match(src('app', 'layout.tsx'), /<TrackerLoader \/>/);
+  });
+});
+
+describe('consent gate (accounts without a recorded account consent)', () => {
+  it('asks when there is no record, when it was withdrawn, and not when it is granted', () => {
+    assert.equal(gateStateFor({ consents: { ACCOUNT_SERVICE: { granted: true, updatedAt: '2026-10-30T00:00:00Z' } } }), 'ok');
+    assert.equal(gateStateFor({ consents: { ACCOUNT_SERVICE: { granted: false, updatedAt: null } } }), 'new');
+    assert.equal(gateStateFor({ consents: { ACCOUNT_SERVICE: { granted: false, updatedAt: '2026-10-30T00:00:00Z' } } }), 'withdrawn');
+    assert.equal(gateStateFor({}), 'new');
+    assert.equal(gateStateFor(null), 'new');
+  });
+  it('keeps settings reachable so a person who does not agree can export or delete their data', () => {
+    assert.equal(gateExempt('/settings'), true);
+    assert.equal(gateExempt('/settings/anything'), true);
+    for (const p of ['/dashboard', '/discover', '/settingsx', '/credits', '', null, undefined]) assert.equal(gateExempt(p as any), false, String(p));
+  });
+  it('is mounted for the signed-in area, needs a ticked required box, and waits for the server before it lets go', () => {
+    assert.match(src('app', '(app)', 'layout.tsx'), /<ConsentGate \/>/);
+    const gate = src('components', 'privacy', 'consent-gate.tsx');
+    assert.match(gate, /choices\.ACCOUNT_SERVICE !== true/);
+    assert.match(gate, /const saved = await recordConsents\(/);
+    assert.match(gate, /if \(!saved\)/);
+    assert.match(gate, /catch \{\s*setState\("ok"\)/, 'a failed lookup must not lock people out');
+  });
+  it('the settings panel lists the account consent and warns before withdrawing it', () => {
+    const panel = src('components', 'privacy', 'privacy-panel.tsx');
+    assert.match(panel, /id: "ACCOUNT_SERVICE"/);
+    assert.match(panel, /window\.confirm\("Withdrawing this consent will schedule your account for deletion/);
+  });
+});
+
+describe('erasure confirmation page', () => {
+  const page = src('components', 'privacy', 'confirm-erasure.tsx');
+  it('reads the secret from the URL fragment, removes it from the address bar and sends it only on a click', () => {
+    assert.match(page, /window\.location\.hash/);
+    assert.match(page, /history\.replaceState/);
+    assert.match(page, /onClick=\{\(\) => void confirm\(\)\}/);
+    assert.doesNotMatch(page, /useEffect\([^)]*confirm\(\)/, 'no automatic confirmation on load');
+    assert.match(page, /\/privacy-requests\/verify/);
   });
 });

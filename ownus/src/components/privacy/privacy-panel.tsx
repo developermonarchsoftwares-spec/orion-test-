@@ -8,11 +8,12 @@ import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { setLocalConsent } from "@/lib/consent";
 
-type Purpose = "ANALYTICS" | "MARKETING" | "PRODUCT_UPDATES" | "SALE_SHARING";
+type Purpose = "ACCOUNT_SERVICE" | "ANALYTICS" | "MARKETING" | "PRODUCT_UPDATES" | "SALE_SHARING";
 interface IConsent { granted: boolean; updatedAt: string | null }
 interface IRequest { id: string; type: "EXPORT" | "DELETE"; status: string; requestedAt: string; executeAfter: string | null; dueAt: string }
 
 const PURPOSES: { id: Purpose; title: string; text: string }[] = [
+  { id: "ACCOUNT_SERVICE", title: "Create and run my account", text: "Required to keep your account. If you withdraw it, your account is scheduled for deletion after 7 days; agree again before then to keep it." },
   { id: "ANALYTICS", title: "Product analytics", text: "Anonymous usage statistics that help us improve Orion." },
   { id: "MARKETING", title: "Marketing e-mails", text: "Offers, case studies and news about Orion." },
   { id: "PRODUCT_UPDATES", title: "Product updates", text: "Feature announcements and service notices that are not required to run your account." },
@@ -40,12 +41,14 @@ export function PrivacyPanel() {
   useEffect(() => { void load(); }, [load]);
 
   const toggle = async (purpose: Purpose, granted: boolean) => {
+    if (purpose === "ACCOUNT_SERVICE" && !granted && !window.confirm("Withdrawing this consent will schedule your account for deletion in 7 days. You can agree again before then to keep it. Continue?")) return;
     setBusy(purpose);
     try {
       const c = await apiClient.request("/privacy/consents", { method: "PUT", body: JSON.stringify({ purpose, granted }) });
       setConsents(c?.consents ?? {});
       if (purpose === "ANALYTICS") setLocalConsent({ analytics: granted });
-      toast.success(granted ? "Preference saved" : "Consent withdrawn");
+      if (purpose === "ACCOUNT_SERVICE") void load(); // a closure may have been scheduled or cancelled: show the request
+      toast.success(granted ? "Preference saved" : purpose === "ACCOUNT_SERVICE" ? "Consent withdrawn. Your account is scheduled for deletion." : "Consent withdrawn");
     } catch (e: any) {
       toast.error(e?.message || "Could not save");
     } finally { setBusy(null); }

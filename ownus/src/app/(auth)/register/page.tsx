@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { OtpInput } from "@/components/auth/otp-input";
 import { ConsentCheckboxes, type ConsentChoices } from "@/components/privacy/consent-checkboxes";
 import { PURPOSES } from "@/lib/compliance";
-import { recordConsents } from "@/lib/consent-sync";
 import { Turnstile, captchaEnabled, type TurnstileHandle } from "@/components/auth/turnstile";
 import { OTP_LENGTH, describeOtpError, isCompleteOtp, maskEmailForDisplay, resendLabel } from "@/lib/otp-flow";
 
@@ -178,9 +177,9 @@ export default function RegisterPage() {
         displayName: name.trim(),
         organizationName: company,
         verificationToken: token,
+        // written by the server in the same step as the account; refusals of the optional purposes are recorded too
+        consents: { ACCOUNT_SERVICE: true, PRODUCT_UPDATES: consents.PRODUCT_UPDATES === true, MARKETING: consents.MARKETING === true },
       });
-      // the session exists now: write the explicit choices (including refusals) to the consent ledger
-      void recordConsents({ ACCOUNT_SERVICE: true, PRODUCT_UPDATES: consents.PRODUCT_UPDATES === true, MARKETING: consents.MARKETING === true });
       toast.success("Email verified. Account created! 5 daily free credits allocated.");
       router.push("/dashboard");
     } catch (err: any) {

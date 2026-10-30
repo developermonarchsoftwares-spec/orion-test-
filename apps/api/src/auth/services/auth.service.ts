@@ -19,6 +19,7 @@ import { AuditLogService } from '../../common/services/audit-log.service';
 import { auditValues } from '../../common/services/audit-values';
 import { EmailOtpService } from './email-otp.service';
 import { registrationOtpRequired } from '../email-otp.util';
+import { parseSignupConsents, POLICY_VERSION, signupConsentRequired } from '../../modules/privacy/privacy.config';
 
 export interface IMfaChallenge {
   mfaRequired: true;
@@ -110,6 +111,12 @@ export class AuthService {
         HttpStatus.FORBIDDEN,
       );
     }
+    // DPDP Act: no account without the person's own, explicit consent to process their account data (always on in production)
+    const consent = parseSignupConsents(dto.consents);
+    if (signupConsentRequired() && !consent.accountService) {
+      await this.auditAuth('REGISTER_DENIED', null, context, 'DENIED', 'CONSENT_REQUIRED', {}, dto.email);
+      throw new BusinessException('Please give your consent to create and run your account, or we cannot register you.', 'CONSENT_REQUIRED', HttpStatus.BAD_REQUEST);
+    }
     const existing = await this.userRepo.findByEmail(dto.email);
     if (existing) {
       throw new BusinessException(
@@ -142,6 +149,13 @@ export class AuthService {
           emailVerifiedAt: otpRequired || !emailVerificationRequired() ? new Date() : null,
         })
         .returning();
+
+      // The consent choices are written with the account: either both exist or neither does
+      if (consent.rows.length) {
+        await tx.insert(schema.consentRecords).values(
+          consent.rows.map((r) => ({ userId: user.id, purpose: r.purpose, granted: r.granted, policyVersion: POLICY_VERSION, source: 'signup', ipAddress: context?.ipAddress ?? null, userAgent: context?.userAgent ?? null })),
+        );
+      }
 
       const todayStr = new Date().toISOString().slice(0, 10);
 

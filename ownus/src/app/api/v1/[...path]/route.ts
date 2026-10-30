@@ -15,6 +15,8 @@ import { sendAdminOtpEmail, isAuthorizedAdminEmail, sendPasswordResetEmail, send
 import { checkCaptcha } from '@/lib/captcha';
 import { createSharedLimiter, type CounterPool } from '@/lib/shared-rate-limit';
 import { REGISTER_WITH_PROOF_SQL, parseProof, poolAdapter, registrationOtpRequired, sendEmailOtp, verifyEmailOtp } from '@/lib/email-otp';
+import { REGISTER_WITH_PROOF_SQL_CONSENT, SIGNUP_CONSENT_ROWS_SQL, parseSignupConsents, signupConsentRequired } from '@/lib/signup-consent';
+import { POLICY_VERSION } from '@/lib/consent';
 import { dispatchUserNotification } from '@/lib/notification-dispatcher';
 import { queryDb, queryDbStrict, DbWriteError, getDbPool } from '@/lib/db';
 import { claimOtpAttempt, redeemOtp } from '@/lib/admin-otp-store';
@@ -1708,6 +1710,17 @@ async function handleRegister(req: NextRequest): Promise<NextResponse> {
       { status: 403 }
     );
   }
+  // DPDP Act: no account without the person's own, explicit consent to process their account data (always on in production)
+  const consent = parseSignupConsents(body?.consents);
+  if (signupConsentRequired() && !consent.accountService) {
+    return NextResponse.json(
+      { success: false, statusCode: 400, errorCode: 'CONSENT_REQUIRED', message: 'Please give your consent to create and run your account, or we cannot register you.' },
+      { status: 400 }
+    );
+  }
+  const consentJson = JSON.stringify(consent.rows);
+  const consentIp = clientIpOf(req);
+  const consentAgent = req.headers.get('user-agent');
   const pwComplaint = passwordComplaint(password);
   if (pwComplaint) {
     return NextResponse.json(
@@ -1738,7 +1751,8 @@ async function handleRegister(req: NextRequest): Promise<NextResponse> {
     if (otpRequired && proof) {
       // One statement: the proof is spent and the account inserted together. A proof that is not live and unspent for exactly this address
       // inserts nothing; a failed insert (for example a duplicate address) leaves the proof unspent. Fails closed when there is no database.
-      const created = await queryDbStrict(REGISTER_WITH_PROOF_SQL, [userId, email, passwordHash, firstName || null, lastName || null, fullName, companyName || null, phone || null, JSON.stringify(metadata), proof.id, proof.hash]);
+      // (the same statement also writes the consent rows, so the account and its consent exist together or not at all)
+      const created = await queryDbStrict(REGISTER_WITH_PROOF_SQL_CONSENT, [userId, email, passwordHash, firstName || null, lastName || null, fullName, companyName || null, phone || null, JSON.stringify(metadata), proof.id, proof.hash, consentJson, POLICY_VERSION, consentIp === 'unknown' ? null : consentIp, consentAgent]);
       if (!created || created.length === 0) {
         return NextResponse.json(
           { success: false, statusCode: 403, errorCode: 'EMAIL_OTP_REQUIRED', message: 'Please verify your email address with the code we send you before creating an account.' },
@@ -1751,6 +1765,7 @@ async function handleRegister(req: NextRequest): Promise<NextResponse> {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'USER', 'ACTIVE', 'EMAIL', $9::jsonb, NOW(), NOW())`,
       [userId, email, passwordHash, firstName || null, lastName || null, fullName, companyName || null, phone || null, JSON.stringify(metadata)]
     );
+    if (consent.rows.length) await queryDbStrict(SIGNUP_CONSENT_ROWS_SQL, [userId, consentJson, POLICY_VERSION, consentIp === 'unknown' ? null : consentIp, consentAgent]);
     }
   } catch (err: any) {
     console.error('[Gateway] DB error inserting new user:', (err as { code?: string })?.code);

@@ -35,3 +35,15 @@ export class CreateRightsRequestDto {
   @MaxLength(4096)
   captchaToken?: string;
 }
+
+/** The confirmation an erasure requester sends after opening the link in the e-mail. */
+export class ConfirmRightsRequestDto {
+  @IsString()
+  @MaxLength(20)
+  reference!: string;
+
+  @IsString()
+  @MinLength(10)
+  @MaxLength(200)
+  token!: string;
+}

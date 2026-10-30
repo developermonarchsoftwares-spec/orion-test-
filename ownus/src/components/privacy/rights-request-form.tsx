@@ -54,7 +54,10 @@ export function RightsRequestForm() {
       <div role="status" className="rounded-xl border border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950/30 p-5 text-sm text-green-900 dark:text-green-200">
         <p className="font-semibold mb-1">Your request was received.</p>
         {receipt.reference ? (
-          <p>Reference: <strong>{receipt.reference}</strong>. We will respond by {receipt.dueAt ? new Date(receipt.dueAt).toLocaleDateString() : `${GRIEVANCE.respondWithinDays} days from today`}. A confirmation was sent to your e-mail address.</p>
+          <>
+            <p>Reference: <strong>{receipt.reference}</strong>. We will respond by {receipt.dueAt ? new Date(receipt.dueAt).toLocaleDateString() : `${GRIEVANCE.respondWithinDays} days from today`}. A confirmation was sent to your e-mail address.</p>
+            {form.type === "ERASURE" && <p className="mt-2">To remove your e-mail address, open the confirmation link in that e-mail. Nothing is removed until you do.</p>}
+          </>
         ) : (
           <p>You already have an open request of this kind. We are working on it and will write to you at that address.</p>
         )}

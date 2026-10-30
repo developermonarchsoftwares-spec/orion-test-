@@ -28,8 +28,8 @@ const writePending = (list: Choice[]) => {
   }
 };
 
-/** Sends every choice in order; those that fail are queued. Never throws. */
-export async function recordConsents(choices: Partial<Record<ConsentPurposeId, boolean>>): Promise<void> {
+/** Sends every choice in order; those that fail are queued. Never throws. Resolves true only when every choice reached the server. */
+export async function recordConsents(choices: Partial<Record<ConsentPurposeId, boolean>>): Promise<boolean> {
   const list: Choice[] = (Object.entries(choices) as [ConsentPurposeId, boolean][]).map(([purpose, granted]) => ({ purpose, granted }));
   const failed: Choice[] = [];
   for (const c of list) {
@@ -40,6 +40,7 @@ export async function recordConsents(choices: Partial<Record<ConsentPurposeId, b
     }
   }
   if (failed.length) writePending([...readPending(), ...failed]);
+  return failed.length === 0;
 }
 
 /** Retries queued choices once a session exists. Safe to call on every page load. */
