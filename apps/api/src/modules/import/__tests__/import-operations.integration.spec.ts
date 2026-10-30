@@ -117,6 +117,8 @@ describe('Upload batch operations (Phase 6.13)', () => {
     app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
+    // listen once so parallel supertest requests share one live server (otherwise each starts it and the first to finish closes it: ECONNRESET)
+    await app.listen(0, '127.0.0.1');
     admin = module.get(AdminImportService);
     await withApprovedSource(admin, db); // Phase 15: stands in for an approved source with automatic publication
 

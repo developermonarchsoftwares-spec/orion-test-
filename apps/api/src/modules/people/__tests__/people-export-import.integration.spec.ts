@@ -184,6 +184,8 @@ const csv = (rows: ExportRowInput[]) => ({ format: 'csv', content: toCsv(rows) }
     app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
     await app.init();
+    // listen once so parallel supertest requests share one live server (otherwise each starts it and the first to finish closes it: ECONNRESET)
+    await app.listen(0, '127.0.0.1');
     ingestion = module.get(PeopleIngestionService);
     jobs = module.get(PeopleImportJobService);
     queue = module.get(QueueService);

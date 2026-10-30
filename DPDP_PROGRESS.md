@@ -161,3 +161,14 @@ Razorpay (payments), Cloudflare Turnstile (bot check), Resend (e-mail), Google a
 | `next build` with only `TURNSTILE_SECRET_KEY` set | **stops with the intended message** ("... NEXT_PUBLIC_TURNSTILE_SITE_KEY is not [set] ...") |
 | Secret scan | 0 findings |
 | **Not verified** | The reseal tool has **not been run against a real database** (tested on in-memory PostgreSQL and type-checked). Redirect behaviour behind the real proxy, and the forgot-password page with a live Turnstile widget, were **not exercised** (nothing is deployed; no browser run) |
+
+### 7d. CI repair (2026-10-30)
+GitHub CI (`.github/workflows/test.yml`) had failed on every run on `main` since at least 2026-10-26, so none of the suites had ever run there. Fixed on this branch:
+| Problem | Fix |
+|---|---|
+| `npm ci` for the web app failed: `ownus/package-lock.json` lacked `@emnapi/core` and `@emnapi/runtime` (optional WASM dependencies a Windows install omits). Reproduced with npm 10.9.2 | Entries added with the registry's exact versions and hashes; passes under npm 10.9.2 on a clean copy |
+| The production-dependency audit would fail on two critical advisories in the web app | `npm audit fix` (lockfile only): Next.js 16.3.8 to 16.4.3, DOMPurify 3.4.16 to 3.4.17; audit now 0 vulnerabilities; web typecheck, 414 tests and build pass |
+| Integration step: `people.integration` "concurrent unlock requests charge once" failed with `read ECONNRESET`. Parallel supertest requests against an app that is not listening each start it, and the first to finish closes it | Test apps now `listen(0, '127.0.0.1')` once: the 7 integration suites that make parallel requests and the shared e2e helper (`test/helpers/test-app.helper.ts`). 8 suites pass in 3 repeat runs. This is also the likely cause of the earlier intermittent `ECONNRESET` in `people-handoff` |
+| The e2e step runs every suite in one process and can exceed Node's default heap | `NODE_OPTIONS=--max-old-space-size=6144` on that CI step |
+
+Local e2e after these changes: 751 passed, 0 failed (one earlier run had 3 suites time out while the machine was busy; they pass alone and in the quiet re-run).

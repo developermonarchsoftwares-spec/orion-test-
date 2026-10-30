@@ -54,6 +54,8 @@ describe('Razorpay webhook: exact raw-body signature verification (Phase 6.18)',
     }).compile();
     app = module.createNestApplication({ rawBody: true }); // exactly what main.ts does
     await app.init();
+    // listen once so parallel supertest requests share one live server (otherwise each starts it and the first to finish closes it: ECONNRESET)
+    await app.listen(0, '127.0.0.1');
   }, 60_000);
 
   afterAll(async () => {

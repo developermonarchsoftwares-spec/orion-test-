@@ -66,6 +66,8 @@ describe('Data quality & pipeline metrics (Phase 6.14)', () => {
     app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
+    // listen once so parallel supertest requests share one live server (otherwise each starts it and the first to finish closes it: ECONNRESET)
+    await app.listen(0, '127.0.0.1');
     const [a, s, d, c] = await Promise.all([seedUser(db, 'm.admin@orion.test', undefined, 'ADMIN'), seedUser(db, 'm.super@orion.test', undefined, 'SUPER_ADMIN'), seedUser(db, 'm.dm@orion.test', undefined, 'DATA_MANAGER'), seedUser(db, 'm.customer@orion.test')]);
     tokens = { admin: tokenFor(a.id, UserRole.ADMIN), superAdmin: tokenFor(s.id, UserRole.SUPER_ADMIN), dm: tokenFor(d.id, UserRole.DATA_MANAGER), customer: tokenFor(c.id, UserRole.USER) };
 

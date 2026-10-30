@@ -92,6 +92,8 @@ describe('People / Decision Maker layer (real Postgres schema via PGlite)', () =
     app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
+    // listen once so parallel supertest requests share one live server (otherwise each starts it and the first to finish closes it: ECONNRESET)
+    await app.listen(0, '127.0.0.1');
 
     write = module.get(PeopleWriteService);
     people = module.get(PeopleService);

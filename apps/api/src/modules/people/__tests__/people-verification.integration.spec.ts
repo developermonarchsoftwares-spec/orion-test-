@@ -117,6 +117,8 @@ describe('People verification (Phase 5): field-level, evidence-backed, separate 
     app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
+    // listen once so parallel supertest requests share one live server (otherwise each starts it and the first to finish closes it: ECONNRESET)
+    await app.listen(0, '127.0.0.1');
     ingest = module.get(PeopleIngestionService);
     write = module.get(PeopleWriteService);
     service = module.get(PeopleVerificationService);
