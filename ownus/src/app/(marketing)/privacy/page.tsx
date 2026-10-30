@@ -298,6 +298,9 @@ export default function PrivacyPage() {
                   We acknowledge requests within 3 business days and complete them within 30 days.
                 </p>
               </div>
+              <p className="mt-3 text-sm">
+                Under India&apos;s DPDP Act you also have the right to a named Grievance Officer. See the <Link href="/privacy-notice" className="underline">Privacy Notice (DPDP)</Link> for the officer&apos;s details, and use the <Link href="/data-rights" className="underline">data-rights form</Link> to make a request. {/* LEGAL REVIEW: reconcile this Policy with the Notice */}
+              </p>
             </section>
           </main>
         </div>

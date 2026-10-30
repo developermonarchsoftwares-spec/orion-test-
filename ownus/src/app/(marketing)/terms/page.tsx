@@ -23,6 +23,7 @@ export default function TermsPage() {
     { id: 'disclaimers-liability', title: '10. Disclaimers & Limitation of Liability' },
     { id: 'governing-law', title: '11. Governing Law & Dispute Resolution' },
     { id: 'contact', title: '12. Legal Questions & Notices' },
+    { id: 'data-protection', title: '13. Data Protection (DPDP Act)' },
   ];
 
   return (
@@ -275,6 +276,24 @@ export default function TermsPage() {
                   Orion Platform &bull; Monarch Softwares Product Portfolio
                 </p>
               </div>
+            </section>
+            <section id="data-protection" className="scroll-mt-28">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-neutral-800 flex items-center gap-2">
+                <FileCheck className="w-5 h-5 text-gray-900 dark:text-white" />
+                13. Data Protection (DPDP Act)
+              </h2>
+              {/* LEGAL REVIEW: draft clause. Counsel to confirm roles (fiduciary / processor), the customer warranty and the liability wording. */}
+              <p className="mb-3 text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200 px-3 py-2">
+                <strong>LEGAL REVIEW:</strong> this clause is a draft and has not been approved by counsel.
+              </p>
+              <ul className="list-disc pl-5 space-y-2 mb-4">
+                <li><strong className="text-gray-900 dark:text-white">Our role:</strong> for your account data, Orion acts as the Data Fiduciary under India&apos;s Digital Personal Data Protection Act, 2023 (&quot;DPDP Act&quot;) and handles it as described in our <Link href="/privacy-notice" className="underline">Privacy Notice</Link>.</li>
+                <li><strong className="text-gray-900 dark:text-white">Your obligations:</strong> you must use personal data you obtain through Orion (including unlocked contact details) only for lawful business outreach, honour any request by a person to stop contacting them, and comply with the DPDP Act and other laws that apply to your use, including laws on unsolicited communications. You are responsible for your own lawful basis and notices to those you contact.</li>
+                <li><strong className="text-gray-900 dark:text-white">Data you upload:</strong> you confirm that you have the right and any required consent to give us the personal data you upload, and that you will tell us if a person withdraws consent or asks for erasure so we can act on it.</li>
+                <li><strong className="text-gray-900 dark:text-white">Your rights and complaints:</strong> you and anyone whose details appear in Orion may exercise their rights, withdraw consent or complain through the <Link href="/data-rights" className="underline">data-rights form</Link> or our Grievance Officer. Removal requests may stop a contact from appearing, including in your saved or exported lists.</li>
+                <li><strong className="text-gray-900 dark:text-white">Security and breaches:</strong> we use reasonable safeguards and will notify you and the Data Protection Board of India of a personal data breach as the law requires. You must tell us promptly if you suspect your account was misused.</li>
+                <li><strong className="text-gray-900 dark:text-white">Withdrawing consent:</strong> you may withdraw a consent at any time. If you withdraw the consent that lets us run your account, we will close the account, and what is already done remains lawful.</li>
+              </ul>
             </section>
           </main>
         </div>

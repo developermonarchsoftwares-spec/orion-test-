@@ -79,7 +79,7 @@ describe('web configuration (Phase 14)', () => {
     expect(next).toMatch(/from "\.\/src\/lib\/security-headers"/);
     expect(next).not.toMatch(/Strict-Transport-Security/);
   });
-  it('browser-visible environment names (NEXT_PUBLIC_*) are limited to two public URLs and the CAPTCHA site key', () => {
+  it('browser-visible environment names (NEXT_PUBLIC_*) are limited to two public URLs, the CAPTCHA site key and the published privacy contact details', () => {
     const names = new Set<string>();
     const walk = (dir: string) => {
       for (const e of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
@@ -90,7 +90,16 @@ describe('web configuration (Phase 14)', () => {
     };
     walk('ownus/src');
     // the Turnstile site key is public by design (it is shipped to every browser to draw the widget); the secret half, TURNSTILE_SECRET_KEY, never carries the prefix
-    expect([...names].sort()).toEqual(['NEXT_PUBLIC_API_URL', 'NEXT_PUBLIC_APP_URL', 'NEXT_PUBLIC_TURNSTILE_SITE_KEY']);
+    // the Grievance Officer and fiduciary details (DPDP Act) are published on the website by law, so they are public by nature; see ownus/src/lib/compliance.ts
+    expect([...names].sort()).toEqual([
+      'NEXT_PUBLIC_API_URL',
+      'NEXT_PUBLIC_APP_URL',
+      'NEXT_PUBLIC_FIDUCIARY_ADDRESS',
+      'NEXT_PUBLIC_GRIEVANCE_ADDRESS',
+      'NEXT_PUBLIC_GRIEVANCE_EMAIL',
+      'NEXT_PUBLIC_GRIEVANCE_OFFICER_NAME',
+      'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+    ]);
     for (const n of names) if (n !== 'NEXT_PUBLIC_TURNSTILE_SITE_KEY') expect(n).not.toMatch(/SECRET|KEY|TOKEN|PASSWORD|DATABASE/);
   });
 });

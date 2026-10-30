@@ -9,6 +9,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { clientIpOf } from '../traffic/client-ip';
 import { RequestDeletionDto, SetConsentDto } from './dto/privacy.dto';
 import { IRequestContext, PrivacyService } from './privacy.service';
+import { RightsRequestService } from './rights-request.service';
 
 const ctxOf = (req: Request): IRequestContext => ({ ip: clientIpOf(req), userAgent: (req.headers['user-agent'] as string) ?? null });
 
@@ -17,7 +18,10 @@ const ctxOf = (req: Request): IRequestContext => ({ ip: clientIpOf(req), userAge
 @Controller('privacy')
 @UseGuards(JwtAuthGuard)
 export class PrivacyController {
-  constructor(private readonly privacy: PrivacyService) {}
+  constructor(
+    private readonly privacy: PrivacyService,
+    private readonly rights: RightsRequestService,
+  ) {}
 
   @Get('consents')
   @ApiOperation({ summary: 'Your current consent choices and the policy version they apply to' })
@@ -67,5 +71,13 @@ export class PrivacyController {
   @ApiOperation({ summary: 'Open data-subject requests, soonest statutory deadline first' })
   adminRequests() {
     return this.privacy.adminOpenRequests();
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Get('admin/rights-requests')
+  @ApiOperation({ summary: 'Open DPDP Data Principal requests from the public form, soonest deadline first' })
+  adminRightsRequests() {
+    return this.rights.listOpen();
   }
 }

@@ -11,8 +11,12 @@ test.describe('PHASE 3: Authentication & Session Testing', () => {
       const submitBtn = page.getByRole('button', { name: /^continue$/i });
       await expect(submitBtn).toBeDisabled();
 
-      // Check terms checkbox
+      // The Terms alone are not enough: the account-data consent is its own required, unticked box (DPDP Act)
       await page.locator('#terms').check();
+      await expect(submitBtn).toBeDisabled();
+      await expect(page.locator('#signup-PRODUCT_UPDATES')).not.toBeChecked();
+      await expect(page.locator('#signup-MARKETING')).not.toBeChecked();
+      await page.locator('#signup-ACCOUNT_SERVICE').check();
       await expect(submitBtn).toBeEnabled();
     });
 
@@ -21,6 +25,7 @@ test.describe('PHASE 3: Authentication & Session Testing', () => {
       await page.waitForLoadState('domcontentloaded');
 
       await page.locator('#terms').check();
+      await page.locator('#signup-ACCOUNT_SERVICE').check();
       const submitBtn = page.getByRole('button', { name: /^continue$/i });
 
       await submitBtn.click();
@@ -37,6 +42,7 @@ test.describe('PHASE 3: Authentication & Session Testing', () => {
       await page.locator('#email').fill('not-a-valid-email');
       await page.locator('#password').fill('SecurePassword123!');
       await page.locator('#terms').check();
+      await page.locator('#signup-ACCOUNT_SERVICE').check();
 
       const submitBtn = page.getByRole('button', { name: /^continue$/i });
       await submitBtn.click();
@@ -76,6 +82,7 @@ test.describe('PHASE 3: Authentication & Session Testing', () => {
       await page.locator('#email').fill(user.email);
       await page.locator('#password').fill(user.password);
       await page.locator('#terms').check();
+      await page.locator('#signup-ACCOUNT_SERVICE').check();
 
       const startedAt = Date.now();
       const submitBtn = page.getByRole('button', { name: /^continue$/i });

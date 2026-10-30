@@ -1,8 +1,13 @@
 /** Bump POLICY_VERSION whenever the privacy policy or terms change materially; every consent record stores the version it was given under. */
 export const POLICY_VERSION = '2026-10-07';
 
-export const CONSENT_PURPOSES = ['ANALYTICS', 'MARKETING', 'PRODUCT_UPDATES', 'SALE_SHARING'] as const;
+// ACCOUNT_SERVICE is the DPDP Act consent to process account data to provide the service, given at sign-up (DPDP review: see DPDP_PROGRESS.md).
+export const CONSENT_PURPOSES = ['ACCOUNT_SERVICE', 'ANALYTICS', 'MARKETING', 'PRODUCT_UPDATES', 'SALE_SHARING'] as const;
 export type ConsentPurpose = (typeof CONSENT_PURPOSES)[number];
+
+/** DPDP Act (India) Data Principal requests taken by the public form. Stored in data_subject_requests, whose `type` is varchar(12). */
+export const RIGHTS_REQUEST_TYPES = ['ACCESS', 'CORRECTION', 'ERASURE', 'WITHDRAWAL', 'GRIEVANCE', 'NOMINATION'] as const;
+export type RightsRequestType = (typeof RIGHTS_REQUEST_TYPES)[number];
 
 const DAY = 24 * 60 * 60 * 1000;
 

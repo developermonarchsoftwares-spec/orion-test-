@@ -9,7 +9,13 @@ import { getLocalConsent, setLocalConsent } from "@/lib/consent";
 export function ConsentBanner() {
   const [open, setOpen] = useState(false);
 
-  useEffect(() => { setOpen(!getLocalConsent().decided); }, []);
+  useEffect(() => {
+    setOpen(!getLocalConsent().decided);
+    // the footer "Privacy choices" link reopens the banner, so a choice can be changed as easily as it was made
+    const reopen = () => setOpen(true);
+    window.addEventListener("orion:open-consent", reopen);
+    return () => window.removeEventListener("orion:open-consent", reopen);
+  }, []);
   if (!open) return null;
 
   const choose = (analytics: boolean) => {
@@ -27,7 +33,7 @@ export function ConsentBanner() {
       <p className="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Your privacy choices</p>
       <p className="mb-3">
         We use essential storage to keep you signed in. With your permission we also use anonymous analytics to improve Orion. Read our{" "}
-        <Link href="/privacy" className="underline">Privacy Policy</Link>. You can change this any time in Settings &rarr; Privacy.
+        <Link href="/privacy-notice" className="underline">Privacy Notice</Link>. Nothing optional runs until you choose, and you can change this any time with "Privacy choices" in the footer or in Settings &rarr; Privacy.
       </p>
       <div className="flex gap-2">
         <button className={`${btn} bg-white dark:bg-zinc-900`} onClick={() => choose(false)}>Essential only</button>

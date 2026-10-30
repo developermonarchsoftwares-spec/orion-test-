@@ -8,6 +8,9 @@ import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
 import { OtpInput } from "@/components/auth/otp-input";
+import { ConsentCheckboxes, type ConsentChoices } from "@/components/privacy/consent-checkboxes";
+import { PURPOSES } from "@/lib/compliance";
+import { recordConsents } from "@/lib/consent-sync";
 import { Turnstile, captchaEnabled, type TurnstileHandle } from "@/components/auth/turnstile";
 import { OTP_LENGTH, describeOtpError, isCompleteOtp, maskEmailForDisplay, resendLabel } from "@/lib/otp-flow";
 
@@ -54,6 +57,8 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  // every consent starts unticked; the account consent is required, the others are optional
+  const [consents, setConsents] = useState<ConsentChoices>({});
   const [isLoading, setIsLoading] = useState(false);
   // Step 1 shows a visible challenge; the resend link on step 2 uses an invisible one that only appears if Cloudflare wants more. A token works once.
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -122,7 +127,11 @@ export default function RegisterPage() {
     e.preventDefault();
     if (busy.current) return;
     if (!agreeTerms) {
-      toast.error("Please agree to the Terms of Service and Privacy Policy.");
+      toast.error("Please accept the Terms of Service.");
+      return;
+    }
+    if (!consents.ACCOUNT_SERVICE) {
+      toast.error("Please give your consent to create and run your account, or you cannot register.");
       return;
     }
     if (password.length < 8) {
@@ -170,6 +179,8 @@ export default function RegisterPage() {
         organizationName: company,
         verificationToken: token,
       });
+      // the session exists now: write the explicit choices (including refusals) to the consent ledger
+      void recordConsents({ ACCOUNT_SERVICE: true, PRODUCT_UPDATES: consents.PRODUCT_UPDATES === true, MARKETING: consents.MARKETING === true });
       toast.success("Email verified. Account created! 5 daily free credits allocated.");
       router.push("/dashboard");
     } catch (err: any) {
@@ -447,16 +458,24 @@ export default function RegisterPage() {
               required
             />
             <label htmlFor="terms" className="text-xs leading-tight text-gray-600 dark:text-gray-400">
-              I agree to the{" "}
+              I accept the{" "}
               <Link href="/terms" className="text-zinc-900 dark:text-zinc-100 underline hover:opacity-80">
                 Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link href="/privacy" className="text-zinc-900 dark:text-zinc-100 underline hover:opacity-80">
-                Privacy Policy
               </Link>
+              . I have read the{" "}
+              <Link href="/privacy-notice" className="text-zinc-900 dark:text-zinc-100 underline hover:opacity-80">
+                Privacy Notice
+              </Link>
+              .
             </label>
           </div>
+
+          <ConsentCheckboxes
+            purposes={PURPOSES.filter((p) => p.id !== "ANALYTICS")}
+            value={consents}
+            onChange={setConsents}
+            idPrefix="signup"
+          />
 
           <Turnstile
             ref={captchaRef}
@@ -467,7 +486,7 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            disabled={!agreeTerms || isLoading || (captchaEnabled && !captchaToken)}
+            disabled={!agreeTerms || !consents.ACCOUNT_SERVICE || isLoading || (captchaEnabled && !captchaToken)}
             className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-md bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 px-4 py-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:opacity-50 transition-colors cursor-pointer"
           >
             {isLoading ? (
