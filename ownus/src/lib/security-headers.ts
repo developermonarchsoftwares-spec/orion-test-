@@ -77,6 +77,25 @@ export const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), pay
 /** HSTS for one year. includeSubDomains and preload are deliberately absent: both are hard to undo and need every subdomain to be HTTPS-only. */
 export const HSTS_VALUE = 'max-age=31536000';
 
+/**
+ * Production only: a request the proxy says the browser made over plain http is redirected to the same URL over https (permanent, method kept).
+ * It matches on an explicit "x-forwarded-proto: http", so requests with no proxy information (health checks, local use) are left alone.
+ */
+export function httpsRedirectRules(isProd: boolean) {
+  if (!isProd) return [];
+  return [
+    {
+      source: '/:path*',
+      has: [
+        { type: 'header' as const, key: 'x-forwarded-proto', value: 'http' },
+        { type: 'host' as const, value: '(?<host>.*)' },
+      ],
+      destination: 'https://:host/:path*',
+      permanent: true,
+    },
+  ];
+}
+
 export interface IHeader {
   key: string;
   value: string;

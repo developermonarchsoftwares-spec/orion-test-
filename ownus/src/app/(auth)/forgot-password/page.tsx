@@ -1,30 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { Mail, ArrowLeft, CheckCircle, Loader2, AlertCircle } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { Turnstile, captchaEnabled, type TurnstileHandle } from "@/components/auth/turnstile";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  // a Turnstile token works once; the widget is reset after every attempt
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileHandle>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
+    if (captchaEnabled && !captchaToken) {
+      setErrorMsg("Please complete the security check before continuing.");
+      return;
+    }
 
     setIsLoading(true);
     setErrorMsg("");
 
     try {
-      await apiClient.auth.forgotPassword(email);
+      await apiClient.auth.forgotPassword(email, captchaToken);
       setIsSubmitted(true);
     } catch (err: any) {
       setErrorMsg(err?.message || "Failed to send password reset email. Please check your address and try again.");
     } finally {
       setIsLoading(false);
+      captchaRef.current?.reset();
     }
   };
 
@@ -111,9 +120,16 @@ export default function ForgotPasswordPage() {
               </div>
             </div>
 
+            <Turnstile
+              ref={captchaRef}
+              onToken={setCaptchaToken}
+              onUnavailable={() => setErrorMsg("The security check could not load. Disable any content blockers for this site, check your connection and reload the page.")}
+              className="flex justify-center"
+            />
+
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || (captchaEnabled && !captchaToken)}
               className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-md bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200 px-4 py-2 text-sm font-semibold shadow focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white focus:ring-offset-2 disabled:opacity-50 transition-colors cursor-pointer"
             >
               {isLoading ? (

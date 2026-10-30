@@ -41,6 +41,7 @@
     "drizzle:studio": "drizzle-kit studio",
     "drizzle:push": "ts-node -r tsconfig-paths/register scripts/require-safe-database.ts \"drizzle-kit push\" && drizzle-kit push",
     "db:reconcile-credits": "ts-node -r tsconfig-paths/register scripts/reconcile-credits.ts",
+    "db:reseal-secrets": "ts-node -r tsconfig-paths/register scripts/reseal-secrets.ts",
     "db:retention": "ts-node -r tsconfig-paths/register scripts/retention-run.ts",
     "db:ledger": "ts-node -r tsconfig-paths/register scripts/deletion-ledger.ts",
     "payments:check": "ts-node -r tsconfig-paths/register scripts/check-razorpay.ts",

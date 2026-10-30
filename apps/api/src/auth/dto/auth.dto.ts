@@ -127,6 +127,12 @@ export class ForgotPasswordDto {
   @IsNotEmpty()
   email!: string;
 
+  @ApiPropertyOptional({ description: 'Cloudflare Turnstile token; checked when the deployment has a Turnstile secret.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4096)
+  captchaToken?: string;
+
   @ApiPropertyOptional({ description: 'Honeypot: a hidden form field that real users never fill. Leave it empty or omit it.' })
   @IsOptional()
   @IsString()

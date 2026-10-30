@@ -1940,6 +1940,11 @@ async function handleForgotPassword(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  const captchaRejection = await checkCaptcha(body?.captchaToken, clientIpOf(req));
+  if (captchaRejection) {
+    return NextResponse.json({ success: false, statusCode: captchaRejection.status, errorCode: captchaRejection.errorCode, message: captchaRejection.message }, { status: captchaRejection.status });
+  }
+
   const jwtSecret = gwResetSecret();
   if (!jwtSecret) return authNotConfigured();
 
