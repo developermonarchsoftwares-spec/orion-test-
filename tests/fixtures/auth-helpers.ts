@@ -117,6 +117,7 @@ export async function registerUserViaUI(
 
   const termsCheckbox = page.locator('#terms');
   await termsCheckbox.check();
+  await page.locator('#signup-ACCOUNT_SERVICE').check(); // required consent to process account data (DPDP Act); the optional ones stay unticked
 
   await pace('send-otp');
   await pace('register');

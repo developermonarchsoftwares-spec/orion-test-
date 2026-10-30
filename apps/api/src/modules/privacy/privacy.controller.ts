@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
@@ -8,7 +8,9 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { clientIpOf } from '../traffic/client-ip';
 import { RequestDeletionDto, SetConsentDto } from './dto/privacy.dto';
+import { DecideRightsRequestDto } from './dto/rights-request.dto';
 import { IRequestContext, PrivacyService } from './privacy.service';
+import { RightsRequestService } from './rights-request.service';
 
 const ctxOf = (req: Request): IRequestContext => ({ ip: clientIpOf(req), userAgent: (req.headers['user-agent'] as string) ?? null });
 
@@ -17,7 +19,10 @@ const ctxOf = (req: Request): IRequestContext => ({ ip: clientIpOf(req), userAge
 @Controller('privacy')
 @UseGuards(JwtAuthGuard)
 export class PrivacyController {
-  constructor(private readonly privacy: PrivacyService) {}
+  constructor(
+    private readonly privacy: PrivacyService,
+    private readonly rights: RightsRequestService,
+  ) {}
 
   @Get('consents')
   @ApiOperation({ summary: 'Your current consent choices and the policy version they apply to' })
@@ -67,5 +72,31 @@ export class PrivacyController {
   @ApiOperation({ summary: 'Open data-subject requests, soonest statutory deadline first' })
   adminRequests() {
     return this.privacy.adminOpenRequests();
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Get('admin/rights-requests')
+  @ApiOperation({ summary: 'Open DPDP Data Principal requests from the public form, soonest deadline first' })
+  adminRightsRequests(@Query('closed') closed?: string) {
+    return this.rights.listOpen(closed === 'true');
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Get('admin/rights-requests/:reference')
+  @ApiOperation({ summary: 'One DPDP request with where the address appears in Orion (counts and names of matching people)' })
+  adminRightsRequest(@Param('reference') reference: string) {
+    return this.rights.detail(reference);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Post('admin/rights-requests/:reference/decision')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  @ApiOperation({ summary: 'Ask the requester for information, complete the request or reject it; the requester is told by e-mail first' })
+  decideRightsRequest(@CurrentUser() admin: IJwtPayload, @Param('reference') reference: string, @Body() dto: DecideRightsRequestDto, @Req() req: Request) {
+    return this.rights.decide(reference, admin.sub, dto, ctxOf(req));
   }
 }

@@ -77,6 +77,10 @@ const TAB_TITLES: Record<AdminTab, { title: string; subtitle: string }> = {
     title: 'People Review & Publishing',
     subtitle: 'Review decision makers found by ingestion: approve roles one by one, correct data, quarantine or suppress'
   },
+  rights_queue: {
+    title: 'Privacy Requests',
+    subtitle: 'Data-rights requests under the DPDP Act: access, correction, erasure, withdrawal, grievance and nomination'
+  },
   enrichment: {
     title: 'Data Enrichment Pipeline',
     subtitle: 'Queue workers for automated web scraping, GST lookup, and social intelligence'

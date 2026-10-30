@@ -3,7 +3,7 @@ import * as path from 'path';
 import { environmentValidationSchema } from '../env.validation';
 import { DEV_ONLY_DEFAULTS, productionOptional, productionRequired } from '../secrets';
 
-const PROD = { NODE_ENV: 'production', JWT_ACCESS_SECRET: 'a'.repeat(32), JWT_REFRESH_SECRET: 'b'.repeat(32), DATABASE_URL: 'postgresql://u:p@db.example:5432/orion' };
+const PROD = { NODE_ENV: 'production', JWT_ACCESS_SECRET: 'a'.repeat(32), JWT_REFRESH_SECRET: 'b'.repeat(32), DATABASE_URL: 'postgresql://u:p@db.example:5432/orion', MFA_ENCRYPTION_KEY: 'm'.repeat(40) + 'k1', INTEGRATIONS_ENCRYPTION_KEY: 'i'.repeat(40) + 'k2', TURNSTILE_SECRET_KEY: 'turnstile-secret-for-tests' };
 const check = (env: Record<string, string>) => environmentValidationSchema.validate(env, { allowUnknown: true, abortEarly: false });
 
 describe('Production configuration (Phase 6.18)', () => {

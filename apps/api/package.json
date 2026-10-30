@@ -41,6 +41,7 @@
     "drizzle:studio": "drizzle-kit studio",
     "drizzle:push": "ts-node -r tsconfig-paths/register scripts/require-safe-database.ts \"drizzle-kit push\" && drizzle-kit push",
     "db:reconcile-credits": "ts-node -r tsconfig-paths/register scripts/reconcile-credits.ts",
+    "db:reseal-secrets": "ts-node -r tsconfig-paths/register scripts/reseal-secrets.ts",
     "db:retention": "ts-node -r tsconfig-paths/register scripts/retention-run.ts",
     "db:ledger": "ts-node -r tsconfig-paths/register scripts/deletion-ledger.ts",
     "payments:check": "ts-node -r tsconfig-paths/register scripts/check-razorpay.ts",
@@ -85,7 +86,7 @@
     "rxjs": "^7.8.1",
     "typesense": "^1.8.2",
     "winston": "^3.17.0",
-    "zod": "^3.24.2"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

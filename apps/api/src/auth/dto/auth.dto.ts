@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, MinLength, MaxLength } from 'class-validator';
 
 /* Bodies that used to be inline types, which the validation pipe cannot check: a number or object where text was expected reached the code and was a 500.
    Fields stay optional so the controllers' own "please provide ..." answers for a missing value are unchanged. */
@@ -78,6 +78,11 @@ export class RegisterDto {
   @MaxLength(200)
   verificationToken?: string;
 
+  @ApiPropertyOptional({ description: 'Explicit consent choices from the sign-up form: { ACCOUNT_SERVICE: true (required in production), PRODUCT_UPDATES?: boolean, MARKETING?: boolean }. Recorded in the consent ledger with the account.' })
+  @IsOptional()
+  @IsObject()
+  consents?: Record<string, unknown>;
+
   @ApiPropertyOptional({ description: 'Honeypot: a hidden form field that real users never fill. Leave it empty or omit it.' })
   @IsOptional()
   @IsString()
@@ -121,6 +126,12 @@ export class ForgotPasswordDto {
   @IsEmail()
   @IsNotEmpty()
   email!: string;
+
+  @ApiPropertyOptional({ description: 'Cloudflare Turnstile token; checked when the deployment has a Turnstile secret.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4096)
+  captchaToken?: string;
 
   @ApiPropertyOptional({ description: 'Honeypot: a hidden form field that real users never fill. Leave it empty or omit it.' })
   @IsOptional()

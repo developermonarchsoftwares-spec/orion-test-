@@ -5,7 +5,7 @@ import { environmentValidationSchema } from '../env.validation';
 import { isPlaceholderSecret, resolveSecret } from '../secrets';
 
 const REAL = 'f3a91c07d5e24b86a0c1d9e7b25f4a63';
-const PROD = { NODE_ENV: 'production', JWT_ACCESS_SECRET: REAL, JWT_REFRESH_SECRET: REAL.split('').reverse().join(''), DATABASE_URL: 'postgresql://u:p@db.example:5432/orion' };
+const PROD = { NODE_ENV: 'production', JWT_ACCESS_SECRET: REAL, JWT_REFRESH_SECRET: REAL.split('').reverse().join(''), DATABASE_URL: 'postgresql://u:p@db.example:5432/orion', MFA_ENCRYPTION_KEY: 'm'.repeat(40) + 'k1', INTEGRATIONS_ENCRYPTION_KEY: 'i'.repeat(40) + 'k2', TURNSTILE_SECRET_KEY: 'turnstile-secret-for-tests' };
 const check = (env: Record<string, string>) => environmentValidationSchema.validate(env, { allowUnknown: true, abortEarly: false });
 const ROOT = path.resolve(__dirname, '../../../../..');
 const JWT_LINE = /^\s+JWT_(ACCESS|REFRESH)_SECRET:/;

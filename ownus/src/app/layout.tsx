@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/lib/auth-context';
 import { MobileResponsiveGuard } from '@/components/mobile-responsive-guard';
 import { ConsentBanner } from '@/components/privacy/consent-banner';
+import { TrackerLoader } from '@/components/privacy/tracker-loader';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -58,6 +59,7 @@ export default function RootLayout({
               {children}
             </MobileResponsiveGuard>
             <ConsentBanner />
+            <TrackerLoader />
             <Toaster position="bottom-right" />
           </ThemeProvider>
         </AuthProvider>

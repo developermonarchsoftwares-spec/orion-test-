@@ -75,4 +75,7 @@ jobs:
       - name: Performance budgets
         run: npm run test:perf
       - name: API end-to-end
+        # one process runs all e2e suites in order; Node's default heap (about 2 GB on some runners) is not enough for the whole run
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run test:e2e

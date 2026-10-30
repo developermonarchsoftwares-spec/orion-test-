@@ -231,7 +231,7 @@ export class ApiClient {
     refresh: (refreshToken: string) => this.request('/auth/refresh', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
     logout: (refreshToken?: string) => this.request('/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
     changePassword: (dto: any) => this.request('/auth/change-password', { method: 'POST', body: JSON.stringify(dto) }),
-    forgotPassword: (email: string) => this.request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+    forgotPassword: (email: string, captchaToken?: string | null) => this.request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email, ...(captchaToken ? { captchaToken } : {}) }) }),
     resetPassword: (dto: any) => this.request('/auth/reset-password', { method: 'POST', body: JSON.stringify(dto) }),
     getGoogleUrl: (prompt?: string) => `${this.getBaseUrl()}/auth/google${prompt ? `?prompt=${prompt}` : ''}`,
     getMicrosoftUrl: (prompt?: string) => `${this.getBaseUrl()}/auth/microsoft${prompt ? `?prompt=${prompt}` : ''}`,

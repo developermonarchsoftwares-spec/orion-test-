@@ -188,6 +188,8 @@ describe('People Pipeline bundle import (Phase 9D): POST /admin/people/import/bu
     app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }));
     await app.init();
+    // listen once so parallel supertest requests share one live server (otherwise each starts it and the first to finish closes it: ECONNRESET)
+    await app.listen(0, '127.0.0.1');
     ingestion = module.get(PeopleIngestionService);
     jobsSvc = module.get(PeopleImportJobService);
     queue = module.get(QueueService);

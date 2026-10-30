@@ -42,6 +42,18 @@ export const environmentValidationSchema = Joi.object({
   JWT_ISSUER: Joi.string().empty('').default('orion-api'),
   JWT_AUDIENCE: Joi.string().empty('').default('orion-client'),
 
+  // Encryption keys for secrets stored at rest (MFA seeds, integration credentials). Required in production: new data is never sealed with a key
+  // derived from the JWT secret or a constant there (see auth/services/secret-box.util.ts). The PREVIOUS variables list old keys during a rotation.
+  MFA_ENCRYPTION_KEY: Joi.string().empty('').min(32).custom((value: string, helpers) => (isPlaceholderSecret(value) ? helpers.error('any.invalid') : value), 'example or placeholder value').when('NODE_ENV', { is: 'production', then: Joi.required() }),
+  INTEGRATIONS_ENCRYPTION_KEY: Joi.string().empty('').min(32).custom((value: string, helpers) => (isPlaceholderSecret(value) ? helpers.error('any.invalid') : value), 'example or placeholder value').when('NODE_ENV', { is: 'production', then: Joi.required() }),
+  MFA_ENCRYPTION_KEY_PREVIOUS: Joi.string().empty('').optional(),
+  INTEGRATIONS_ENCRYPTION_KEY_PREVIOUS: Joi.string().empty('').optional(),
+
+  // Bot protection (Cloudflare Turnstile). Required in production: without the secret the check is silently skipped. A deployment that
+  // knowingly runs without it must say so with ALLOW_NO_CAPTCHA=true (the API then starts and logs a warning on every sign-in request).
+  TURNSTILE_SECRET_KEY: Joi.string().empty('').when('NODE_ENV', { is: 'production', then: Joi.when('ALLOW_NO_CAPTCHA', { is: Joi.valid('true').required(), then: Joi.optional(), otherwise: Joi.required() }) }),
+  ALLOW_NO_CAPTCHA: Joi.string().valid('true', 'false').empty('').optional(),
+
   // Storage
   STORAGE_PROVIDER: Joi.string().valid('s3', 'r2', 'minio', 'local').empty('').default('minio'),
   STORAGE_BUCKET: Joi.string().empty('').default('orion-assets'),

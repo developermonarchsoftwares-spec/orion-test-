@@ -1,5 +1,6 @@
 import { Topbar } from '@/components/layout/topbar';
 import { RequireAuth } from '@/components/layout/require-auth';
+import { ConsentGate } from '@/components/privacy/consent-gate';
 
 export default function AppLayout({
   children,
@@ -11,6 +12,7 @@ export default function AppLayout({
       <Topbar />
       <div className="flex-1 mt-14 flex flex-col">
         <RequireAuth>{children}</RequireAuth>
+        <ConsentGate />
       </div>
     </div>
   );

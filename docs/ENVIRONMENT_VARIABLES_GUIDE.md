@@ -192,8 +192,12 @@ Essential for dispatching real 6-digit verification codes to administrator email
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `RESTORE_MODE` | No | unset | `true` starts the API with no queue worker, scheduled export, webhook delivery, credit rollover, retention or token clean-up. Use it for the first start after restoring a database; remove it afterwards. |
-| `MFA_ENCRYPTION_KEY` | Strongly recommended in production | falls back to `JWT_ACCESS_SECRET` | Encrypts stored MFA secrets. If it is empty, rotating the JWT access secret makes every stored MFA secret unreadable. Keep it in the secret store, escrowed apart from backups; never store it in a backup. |
-| `INTEGRATIONS_ENCRYPTION_KEY` | Strongly recommended in production | falls back to `JWT_ACCESS_SECRET` | Same, for webhook signing secrets and CRM credentials. |
+| `MFA_ENCRYPTION_KEY` | **Required in production** (the API will not start without it), at least 32 characters | none; outside production a development-only key is used and a warning is logged | Encrypts stored MFA secrets. New data is written as `v2.<key id>...` under this key and never under a key derived from `JWT_ACCESS_SECRET`; rows written earlier (`v1`) still open until they are resealed. Keep it in the secret store, escrowed apart from backups; never store it in a backup. |
+| `INTEGRATIONS_ENCRYPTION_KEY` | **Required in production**, at least 32 characters | as above | Same, for webhook signing secrets and CRM credentials. |
+| `MFA_ENCRYPTION_KEY_PREVIOUS`, `INTEGRATIONS_ENCRYPTION_KEY_PREVIOUS` | No | unset | Old keys (comma separated), only while rotating. Rotation: set the new key and the old one here, deploy, run `npm run db:reseal-secrets` (dry run) and then `-- --apply` with `RESEAL_CONFIRM_DATABASE=<database name>`, check it reports up to date, then remove the old key. **Run the reseal before changing `JWT_ACCESS_SECRET`** if any row is still in the old format, or those rows become unreadable. |
+| `TURNSTILE_SECRET_KEY` (and the web's `NEXT_PUBLIC_TURNSTILE_SITE_KEY`) | **Required in production** | none | Bot protection on sign-in, sign-up code, and forgot-password. Set both keys together: a production web build stops if only one is set. With no secret in production the API will not start and the gateway refuses the request (fails closed). |
+| `HEALTH_HEAP_LIMIT_MB` | No | `1024` | Heap size (MB, 128 or more) above which `/health` reports `memory_heap` down and answers 503. Leave unset in production. The test setup raises it because one process runs every e2e suite. |
+| `ALLOW_NO_CAPTCHA` | No | unset | `true` records the decision to run production without bot protection: the API starts, requests pass unchecked, and a warning is logged. Never set it to hide a missing key. |
 
 ### Sign-up e-mail verification code (see `EMAIL_OTP_VERIFICATION.md`)
 

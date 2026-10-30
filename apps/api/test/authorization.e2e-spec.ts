@@ -75,6 +75,10 @@ const EXPECTED_PUBLIC: string[] = [
   'POST /api/v1/auth/verify-otp', // checks the code (5 tries); returns a one-time proof, never a session
   'POST /api/v1/integrations/callbacks/:integrationId', // authenticated by HMAC signature
   'POST /api/v1/payments/webhook', // authenticated by the provider signature over the raw body
+  // DPDP Act intake for people who may not have an account. Both are rate limited; the first also checks Turnstile when configured, and
+  // the second acts only with the one-time secret e-mailed to the address (reviewed in DPDP_PROGRESS.md D17)
+  'POST /api/v1/privacy-requests',
+  'POST /api/v1/privacy-requests/verify',
 ];
 
 describe('Authorization: function level, object level, mass assignment, shared-lead isolation', () => {

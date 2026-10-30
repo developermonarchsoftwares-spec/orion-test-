@@ -153,7 +153,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request password reset instructions' })
   @ApiResponse({ status: 200, description: 'Reset link generated' })
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+  async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
+    // a reset e-mail is sent to whatever address is typed, so a bot must not be able to use this to flood mailboxes
+    await this.captcha.assertHuman(dto.captchaToken, clientIpOf(req));
     return this.authService.forgotPassword(dto.email);
   }
 

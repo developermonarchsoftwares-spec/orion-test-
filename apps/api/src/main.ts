@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import { AppModule } from './app.module';
+import { httpsEnforcement } from './common/http/https-policy';
 import { applyUploadBodyLimit } from './common/http/upload-body-limit';
 import { apiCorsOptions, securityMiddleware } from './common/http/security-headers';
 import { StructuredLogger } from './common/observability/structured-logger';
@@ -27,6 +28,9 @@ function setupApp(app: INestApplication) {
       expressInstance.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
     }
   }
+
+  // Production: a request the proxy marked as plain http is redirected to https (or refused) before anything else runs
+  app.use(httpsEnforcement());
 
   // Security headers: Helmet (HSTS in production only, no includeSubDomains/preload) and then the strict Content-Security-Policy,
   // Permissions-Policy and no-store for credentialed responses. One chain, shared with the tests (common/http/security-headers.ts).

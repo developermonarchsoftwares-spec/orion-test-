@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { GRIEVANCE } from '@/lib/compliance';
+import { PrivacyChoicesButton } from '@/components/privacy/privacy-choices-button';
 
 export function Footer() {
   return (
@@ -62,11 +64,19 @@ export function Footer() {
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white tracking-wider uppercase mb-4">Legal</h3>
             <ul className="flex flex-col gap-3">
               <li><Link href="/privacy" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white text-sm transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/privacy-notice" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white text-sm transition-colors">Privacy Notice (DPDP)</Link></li>
+              <li><Link href="/data-rights" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white text-sm transition-colors">Data rights request</Link></li>
+              <li><PrivacyChoicesButton className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white text-sm transition-colors cursor-pointer" /></li>
               <li><Link href="/terms" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white text-sm transition-colors">Terms of Service</Link></li>
               <li><Link href="/security" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white text-sm transition-colors">Security</Link></li>
               <li><Link href="/status" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white text-sm transition-colors">System Status</Link></li>
             </ul>
           </div>
+        </div>
+
+        {/* Grievance Officer (DPDP Act): published here and in the Privacy Notice */}
+        <div className="mt-10 pt-6 border-t border-gray-200 dark:border-neutral-900 text-xs text-gray-500 dark:text-gray-400" aria-label="Grievance Officer">
+          <p><strong className="text-gray-700 dark:text-gray-300">Grievance Officer:</strong> {GRIEVANCE.officerName} &middot; <a href={`mailto:${GRIEVANCE.email}`} className="underline">{GRIEVANCE.email}</a> &middot; <Link href="/data-rights" className="underline">Make a data-rights request</Link></p>
         </div>
 
         {/* Big Logo in bottom footer section */}

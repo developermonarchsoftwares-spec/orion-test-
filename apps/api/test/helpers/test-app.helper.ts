@@ -59,6 +59,8 @@ export class TestAppHelper {
     );
 
     await this.app.init();
+    // listen once so parallel supertest requests share one live server (otherwise each starts it and the first to finish closes it: ECONNRESET)
+    await this.app.listen(0, '127.0.0.1');
 
     this.db = this.app.get<DrizzleDb>(DRIZZLE_DATABASE);
     this.pool = this.app.get<Pool>(PG_POOL);
