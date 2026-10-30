@@ -92,6 +92,7 @@ export function AdminSidebar({
         { id: 'duplicates', label: 'Duplicate Manager', icon: CopyX, alertCount: badgeCounts.duplicates },
         { id: 'publish_queue', label: 'Publish Queue', icon: Layers, alertCount: badgeCounts.pendingReviews },
         { id: 'people_review', label: 'People Review', icon: UserCheck },
+        { id: 'rights_queue', label: 'Privacy Requests', icon: ShieldCheck },
         { id: 'data_quality', label: 'Data Quality Metrics', icon: ShieldAlert },
         { id: 'enrichment', label: 'Data Enrichment', icon: Sparkles, tag: 'LEGACY' },
         { id: 'published', label: 'Published Businesses', icon: CheckCircle2 },

@@ -15,6 +15,7 @@ export type AdminTab =
   | 'duplicates'
   | 'publish_queue'
   | 'people_review'
+  | 'rights_queue'
   | 'upload_ops'
   | 'people_import'
   | 'data_quality'

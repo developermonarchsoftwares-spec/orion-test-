@@ -1,6 +1,6 @@
 import { randomBytes, createHash, timingSafeEqual } from 'crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { asc, eq, inArray, notInArray, and, sql } from 'drizzle-orm';
+import { asc, desc, eq, inArray, notInArray, and, sql } from 'drizzle-orm';
 import { BusinessException } from '../../common/errors/business.exception';
 import { AuditLogService } from '../../common/services/audit-log.service';
 import { DRIZZLE_DATABASE } from '../../database/database.constants';
@@ -9,8 +9,8 @@ import * as s from '../../database/schema';
 import { MailService } from '../../auth/mail/mail.service';
 import { oauthFrontendUrl } from '../oauth/oauth-urls';
 import { ContactSuppressionService } from './contact-suppression.service';
-import { REQUEST_DEADLINE_MS, RIGHTS_REQUEST_TYPES } from './privacy.config';
-import { CreateRightsRequestDto } from './dto/rights-request.dto';
+import { privacyContactEmail, REQUEST_DEADLINE_MS, RIGHTS_REQUEST_TYPES } from './privacy.config';
+import { CreateRightsRequestDto, DecideRightsRequestDto } from './dto/rights-request.dto';
 import { IRequestContext } from './privacy.service';
 
 /** Types that need the requester to say what is wrong or what they want, so an empty request is refused. */
@@ -191,8 +191,9 @@ export class RightsRequestService {
     return { verified: true, completed };
   }
 
-  /** Open rights requests, soonest deadline first (admin queue). */
-  async listOpen() {
+  /** The queue, soonest deadline first. Open requests by default; `closed` returns the most recently finished ones instead. */
+  async listOpen(closed = false) {
+    const open = notInArray(s.dataSubjectRequests.status, ['COMPLETED', 'REJECTED']);
     return this.db
       .select({
         reference: s.dataSubjectRequests.reference,
@@ -201,12 +202,142 @@ export class RightsRequestService {
         contactEmail: s.dataSubjectRequests.contactEmail,
         requesterNote: s.dataSubjectRequests.requesterNote,
         details: s.dataSubjectRequests.details,
+        verifiedAt: s.dataSubjectRequests.verifiedAt,
         dueAt: s.dataSubjectRequests.dueAt,
         createdAt: s.dataSubjectRequests.createdAt,
+        completedAt: s.dataSubjectRequests.completedAt,
       })
       .from(s.dataSubjectRequests)
-      .where(and(inArray(s.dataSubjectRequests.type, [...RIGHTS_REQUEST_TYPES]), notInArray(s.dataSubjectRequests.status, ['COMPLETED', 'REJECTED'])))
-      .orderBy(asc(s.dataSubjectRequests.dueAt))
-      .limit(500);
+      .where(and(inArray(s.dataSubjectRequests.type, [...RIGHTS_REQUEST_TYPES]), closed ? inArray(s.dataSubjectRequests.status, ['COMPLETED', 'REJECTED']) : open))
+      .orderBy(closed ? desc(s.dataSubjectRequests.completedAt) : asc(s.dataSubjectRequests.dueAt))
+      .limit(closed ? 100 : 500);
+  }
+
+  private async findByReference(reference: string) {
+    const [row] = await this.db
+      .select()
+      .from(s.dataSubjectRequests)
+      .where(and(eq(s.dataSubjectRequests.reference, reference), inArray(s.dataSubjectRequests.type, [...RIGHTS_REQUEST_TYPES])))
+      .limit(1);
+    if (!row) throw new BusinessException('Request not found', 'NOT_FOUND', 404);
+    return row;
+  }
+
+  /** People whose work e-mail is this address. Names only; they are suppressed in People Review, never here. */
+  private async peopleWithEmail(email: string) {
+    return this.db
+      .select({ id: s.people.id, fullName: s.people.fullName, dataStatus: s.people.dataStatus })
+      .from(s.personContacts)
+      .innerJoin(s.people, eq(s.people.id, s.personContacts.personId))
+      .where(and(eq(s.personContacts.contactType, 'WORK_EMAIL'), eq(s.personContacts.normalizedValue, email.toLowerCase())))
+      .groupBy(s.people.id, s.people.fullName, s.people.dataStatus);
+  }
+
+  /** One request with what the reviewer needs to decide it: where the address appears in Orion (counts and names, never other people's contact values). */
+  async detail(reference: string) {
+    const row = await this.findByReference(reference);
+    const email = row.contactEmail;
+    let customerAccount = false;
+    let companyContacts = 0;
+    let people: Array<{ id: string; fullName: string; dataStatus: string }> = [];
+    if (email) {
+      const lower = email.toLowerCase();
+      const users = await this.db.select({ id: s.users.id }).from(s.users).where(and(sql`lower(${s.users.email}) = ${lower}`, sql`${s.users.deletedAt} IS NULL`)).limit(1);
+      customerAccount = users.length > 0;
+      const counted: any[] = await this.db.select({ n: sql<number>`count(*)::int` }).from(s.businessContacts).where(sql`lower(${s.businessContacts.email}) = ${lower}`);
+      companyContacts = counted[0]?.n ?? 0;
+      people = await this.peopleWithEmail(email);
+    }
+    return {
+      reference: row.reference,
+      type: row.type,
+      status: row.status,
+      contactEmail: row.contactEmail,
+      requesterNote: row.requesterNote,
+      details: row.details,
+      evidence: row.evidence,
+      verifiedAt: row.verifiedAt,
+      publicMessage: row.publicMessage,
+      decisionReason: row.decisionReason,
+      resultSummary: row.resultSummary,
+      dueAt: row.dueAt,
+      createdAt: row.createdAt,
+      completedAt: row.completedAt,
+      found: { customerAccount, companyContacts, people },
+    };
+  }
+
+  /**
+   * A reviewer's decision. The outcome e-mail goes out FIRST: if it cannot be sent nothing changes, so the requester is never left without
+   * an answer and the address is never cleared before it was used. Rules that protect the people involved:
+   *  - an ERASURE is completed only after the requester proved control of the address, and only once every person with that work e-mail
+   *    has been suppressed in People Review;
+   *  - anything else that releases or changes data (access, correction, withdrawal, nomination) needs the reviewer to confirm they checked
+   *    who the requester is; a grievance does not;
+   *  - asking for information or rejecting needs a message for the requester, and a rejection also an internal reason.
+   * A finished request keeps no address, free text or note.
+   */
+  async decide(reference: string, adminId: string, dto: DecideRightsRequestDto, ctx: IRequestContext) {
+    const row = await this.findByReference(reference);
+    if (row.status === 'COMPLETED' || row.status === 'REJECTED') throw new BusinessException('This request is already closed.', 'REQUEST_CLOSED', 409);
+    const message = (dto.message ?? '').trim();
+    const reason = (dto.reason ?? '').trim();
+    const action = dto.action;
+    if (action === 'REQUEST_INFO' && message.length < 5) throw new BusinessException('Say what you need from the requester.', 'MESSAGE_REQUIRED');
+    if (action === 'REJECT' && (message.length < 5 || reason.length < 5)) throw new BusinessException('A rejection needs a message for the requester and an internal reason.', 'REASON_REQUIRED');
+    if (!row.contactEmail) throw new BusinessException('The requester address is no longer held, so no answer can be sent.', 'NO_ADDRESS', 409);
+
+    if (action === 'COMPLETE') {
+      if (row.type === 'ERASURE') {
+        if (!row.verifiedAt) throw new BusinessException('The requester has not confirmed the address yet.', 'NOT_VERIFIED', 409);
+        const stillVisible = (await this.peopleWithEmail(row.contactEmail)).filter((p) => p.dataStatus !== 'SUPPRESSED');
+        if (stillVisible.length) {
+          throw new BusinessException(`${stillVisible.length} matching person record(s) are not suppressed yet. Suppress them in People Review first.`, 'PEOPLE_NOT_SUPPRESSED', 409, { remaining: stillVisible.length });
+        }
+      } else if (row.type !== 'GRIEVANCE' && dto.identityChecked !== true) {
+        throw new BusinessException('Confirm that you checked who the requester is.', 'IDENTITY_NOT_CHECKED', 409);
+      }
+    }
+
+    const contact = privacyContactEmail();
+    const subjects: Record<string, string> = { REQUEST_INFO: 'We need more information', COMPLETE: 'Your request is complete', REJECT: 'About your request' };
+    const bodies: Record<string, string> = {
+      REQUEST_INFO: `${message}\n\nPlease reply to ${contact} quoting the reference.`,
+      COMPLETE: message || 'We have completed your request.',
+      REJECT: `${message}\n\nIf you disagree you may write to ${contact}, or complain to the Data Protection Board of India.`,
+    };
+    const sent = this.mail
+      ? await this.mail.sendChecked({ to: row.contactEmail, subject: `${subjects[action]} (${row.reference})`, text: `Hello,\n\n${bodies[action]}\n\nReference: ${row.reference}\n` }).catch(() => false)
+      : false;
+    if (!sent) throw new BusinessException('The e-mail to the requester could not be sent, so nothing was changed. Try again.', 'EMAIL_FAILED', 502);
+
+    const ends = action !== 'REQUEST_INFO';
+    const status = action === 'REQUEST_INFO' ? 'NEEDS_INFO' : action === 'COMPLETE' ? 'COMPLETED' : 'REJECTED';
+    const now = new Date();
+    const previous = (row.resultSummary && typeof row.resultSummary === 'object' ? row.resultSummary : {}) as Record<string, unknown>;
+    await this.db
+      .update(s.dataSubjectRequests)
+      .set({
+        status,
+        publicMessage: message ? message.slice(0, 300) : null,
+        decisionReason: reason ? reason.slice(0, 500) : null,
+        decidedById: adminId,
+        decidedAt: now,
+        completedAt: ends ? now : null,
+        resultSummary: { ...previous, identityChecked: dto.identityChecked === true || previous.identityChecked === true },
+        ...(ends ? { contactEmail: null, details: null, requesterNote: null, proposedValue: null } : {}),
+        updatedAt: now,
+      })
+      .where(eq(s.dataSubjectRequests.id, row.id));
+    await this.audit?.record({
+      userId: adminId,
+      action: 'DPDP_REQUEST_DECISION',
+      entityType: 'data_subject_request',
+      entityId: row.reference,
+      newValues: { decision: action, type: row.type },
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+    });
+    return { reference: row.reference, status };
   }
 }

@@ -87,6 +87,7 @@ import { PeopleReviewView } from '@/components/admin/views/people-review-view';
 import { isReviewUrl } from '@/lib/people-review-url';
 import { UploadOperationsView } from '@/components/admin/views/upload-operations-view';
 import { PeopleImportView } from '@/components/admin/views/people-import-view';
+import { RightsQueueView } from '@/components/admin/views/rights-queue-view';
 import { DataQualityMetricsView } from '@/components/admin/views/data-quality-metrics-view';
 import { DataEnrichmentView } from '@/components/admin/views/data-enrichment-view';
 import { PublishedBusinessesView } from '@/components/admin/views/published-businesses-view';
@@ -1354,6 +1355,8 @@ export default function AdminPortalPage() {
             {activeTab === 'upload_ops' && <UploadOperationsView />}
 
             {activeTab === 'people_import' && <PeopleImportView />}
+
+            {activeTab === 'rights_queue' && <RightsQueueView />}
 
             {activeTab === 'data_quality' && <DataQualityMetricsView />}
 

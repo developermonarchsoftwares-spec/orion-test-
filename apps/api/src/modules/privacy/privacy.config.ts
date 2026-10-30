@@ -33,6 +33,9 @@ export function parseSignupConsents(raw: unknown): { accountService: boolean; ro
   return { accountService, rows };
 }
 
+/** Where a requester is told to write. Same published address as the web app's grievance contact; override with PRIVACY_CONTACT_EMAIL. */
+export const privacyContactEmail = (env: NodeJS.ProcessEnv = process.env): string => (env.PRIVACY_CONTACT_EMAIL || '').trim() || 'privacy@monarchsoftwares.com';
+
 /** DPDP Act (India) Data Principal requests taken by the public form. Stored in data_subject_requests, whose `type` is varchar(12). */
 export const RIGHTS_REQUEST_TYPES = ['ACCESS', 'CORRECTION', 'ERASURE', 'WITHDRAWAL', 'GRIEVANCE', 'NOMINATION'] as const;
 export type RightsRequestType = (typeof RIGHTS_REQUEST_TYPES)[number];
